@@ -29,7 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("-C", dest="dir", default=".", help="run in this directory")
     mode = c.add_mutually_exclusive_group()
     mode.add_argument("--staged", action="store_true", help="the index (pre-commit)")
-    mode.add_argument("--base", metavar="REF", help="working tree against merge-base(REF, HEAD); 'auto' picks the PR base in CI")
+    mode.add_argument(
+        "--base", metavar="REF", help="working tree against merge-base(REF, HEAD); 'auto' picks the PR base in CI; default: $AGENT_CHECKS_BASE when set"
+    )
     mode.add_argument("--commit", metavar="SHA", help="what one commit adds")
     mode.add_argument("--all", action="store_true", help="every line of every tracked file (audit, not a gate)")
     c.add_argument("--format", choices=["text", "json", "github"], default="text")
@@ -80,8 +82,10 @@ def collect(root: Path, a) -> tuple[list[gitdiff.FileChange], Path | None]:
         return gitdiff.commit(root, a.commit)
     if a.all:
         return gitdiff.all_files(root, paths), None
-    if a.base:
-        ref = resolve_base(root, a.base)
+    # An orchestrator that runs commands as argv, without a shell, sets the base in the environment.
+    base = a.base or (None if (a.staged or a.commit or a.all) else os.environ.get("AGENT_CHECKS_BASE") or None)
+    if base:
+        ref = resolve_base(root, base)
         return gitdiff.worktree(root, gitdiff.merge_base(root, ref), paths), None
     if gitdiff.git(root, "diff", "--cached", "--name-only", check=False).strip():
         return gitdiff.staged(root)

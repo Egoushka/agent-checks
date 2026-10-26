@@ -99,6 +99,7 @@ checks comments in code and all text in docs, because identifiers and string dat
 |---|---|
 | `agent-checks check [--staged \| --base REF \| --commit SHA \| --all] [paths]` | the check; `--base auto` picks the PR base in GitHub Actions |
 | `agent-checks check --format json\|github` | machine output, or GitHub annotations |
+| `AGENT_CHECKS_BASE=<sha> agent-checks check` | same as `--base <sha>` when no mode flag is given; for orchestrators that run argv without a shell |
 | `agent-checks hook claude` | Claude Code PostToolUse hook; exit 2 hands the message to the agent |
 | `agent-checks install [DIR]` | lefthook.yml + .agent-checks.toml, existing `.githooks` scripts moved under lefthook |
 | `agent-checks bench -C DIR -n 20` | time the check over a repo's last commits |

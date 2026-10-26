@@ -238,3 +238,13 @@ def test_same_file_assert_helper(repo):
     repo.write("src/test/ATest.kt", "class T {\n  private fun shows(x: Int) { onNode(x).assertExists() }\n  @Test\n  fun a() = shows(1)\n}\n")
     repo.git("add", "-A")
     assert "test-without-assert" not in repo.rules("--staged")
+
+
+def test_base_from_env(repo, monkeypatch):
+    base = repo.git("rev-parse", "HEAD").strip()
+    repo.write("src/A.cs", "public async void Run() { await F(); }\n")
+    repo.commit()
+    monkeypatch.setenv("AGENT_CHECKS_BASE", base)
+    assert repo.rules() == ["async-void"]
+    # An explicit mode wins over the environment.
+    assert repo.rules("--commit", base) == []
