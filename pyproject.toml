@@ -1,6 +1,6 @@
 [project]
 name = "agent-checks"
-version = "0.1.1"
+version = "0.1.2"
 description = "Fast diff checks whose failure messages tell a coding agent what to fix: skipped tests, empty catches, silenced warnings, stubs, tests that assert nothing."
 readme = "README.md"
 license = "MIT"

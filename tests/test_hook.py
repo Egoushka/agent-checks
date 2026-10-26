@@ -41,10 +41,12 @@ def test_hook_ignores_non_repo_and_bad_payload(tmp_path, monkeypatch, capsys):
 def test_install_files_only_leaves_hooks_alone(repo):
     repo.git("config", "core.hooksPath", ".githooks")
     (repo.root / ".githooks").mkdir()
-    (repo.root / ".githooks" / "pre-commit").write_text("#!/bin/sh\nexit 0\n")
+    (repo.root / ".githooks" / "pre-commit").write_text("#!/bin/sh\ngitleaks git --staged\n")
     repo.git("remote", "add", "origin", "https://github.com/x/y.git")
     assert cli.main(["install", str(repo.root), "--files-only"]) == 0
     text = (repo.root / "lefthook.yml").read_text()
     assert "agent-checks check --staged" in text and "run: .githooks/pre-commit" in text
+    assert "gitleaks" not in text  # the repo's own pre-commit already runs it
+    assert "\n\n\n" not in text
     assert "Egoushka/agent-checks@v" in (repo.root / ".github/workflows/agent-checks.yml").read_text()
     assert repo.git("config", "--get", "core.hooksPath").strip() == ".githooks"
