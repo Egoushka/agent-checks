@@ -1,0 +1,10 @@
+# Git hooks, run by lefthook (https://lefthook.dev). After cloning: `lefthook install`.
+# agent-checks messages are written for coding agents: https://github.com/Egoushka/agent-checks
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: agent-checks
+      run: agent-checks check --staged
+    - name: gitleaks
+      run: gitleaks git --staged --redact --no-banner

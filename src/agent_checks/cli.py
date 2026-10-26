@@ -17,6 +17,7 @@ from .engine import Checker, Config, Finding, Result
 
 MAX_PER_RULE = 20
 FOOTER = "Fix each one at its cause, then run the same command again. Do not bypass the check (--no-verify, LEFTHOOK=0) or weaken the rule to get past it."
+HOOK_FOOTER = "Fix each one at its cause in your next edit. Do not weaken the rule or move the code elsewhere to get past it."
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -42,6 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("dir", nargs="?", default=".")
     i.add_argument("--force", action="store_true", help="overwrite an existing lefthook.yml")
     i.add_argument("--dry-run", action="store_true")
+    i.add_argument("--files-only", action="store_true", help="write the files but leave git hooks and core.hooksPath alone (activate after the PR merges)")
 
     r = sub.add_parser("rules", help="list the rules")
     r.add_argument("--markdown", action="store_true")
@@ -166,7 +168,7 @@ def render_warnings(res: Result) -> str:
     return "\n".join(out) + "\n"
 
 
-def render_text(res: Result, header: str | None = None) -> str:
+def render_text(res: Result, header: str | None = None, footer: str = FOOTER) -> str:
     if not res.findings:
         extra = f", {len(res.allowed)} allowed by marker" if res.allowed else ""
         return render_warnings(res) + f"agent-checks: ok ({res.files} files, {res.lines} added lines{extra})\n"
@@ -188,7 +190,7 @@ def render_text(res: Result, header: str | None = None) -> str:
         if rule.allowable and rule.kind in ("line", "ast", "lint"):
             lines.append("  " + R.ALLOW_HINT.format(id=rid))
         lines.append("")
-    lines.append(FOOTER)
+    lines.append(footer)
     return render_warnings(res) + "\n".join(lines) + "\n"
 
 
@@ -222,7 +224,9 @@ def cmd_hook(a) -> int:
     res = run_check(root, gitdiff.worktree(root, None, [rel]))
     if not res.findings:
         return 0
-    sys.stderr.write(render_text(res, header=f"agent-checks found problems in lines you just wrote in {rel}. Fix them now, before moving on."))
+    sys.stderr.write(
+        render_text(res, header=f"agent-checks found problems in lines you just wrote in {rel}. Fix them now, before moving on.", footer=HOOK_FOOTER)
+    )
     return 2
 
 
@@ -234,7 +238,7 @@ def _ignored(root: Path, rel: str) -> bool:
 
 
 def cmd_install(a) -> int:
-    return install.install(Path(a.dir), force=a.force, dry_run=a.dry_run)
+    return install.install(Path(a.dir), force=a.force, dry_run=a.dry_run, files_only=a.files_only)
 
 
 def cmd_rules(a) -> int:
