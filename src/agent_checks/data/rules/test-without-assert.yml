@@ -1,0 +1,81 @@
+# A test method whose body calls nothing that looks like an assertion.
+# The engine applies these only to test files and only when the test's lines are added.
+id: test-without-assert.csharp
+language: CSharp
+rule:
+  kind: method_declaration
+  has:
+    kind: attribute_list
+    regex: '\b(Fact|Theory|Test|TestMethod|TestCase|SkippableFact|SkippableTheory)\b'
+  not:
+    has:
+      kind: invocation_expression
+      regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)'
+      stopBy: end
+---
+id: test-without-assert.java
+language: Java
+rule:
+  kind: method_declaration
+  has: {kind: modifiers, regex: '@(Test|ParameterizedTest)\b'}
+  not:
+    has:
+      kind: method_invocation
+      regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)'
+      stopBy: end
+---
+id: test-without-assert.kotlin
+language: Kotlin
+rule:
+  kind: function_declaration
+  has: {kind: modifiers, regex: '@(Test|ParameterizedTest)\b'}
+  not:
+    has:
+      kind: call_expression
+      regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)'
+      stopBy: end
+---
+id: test-without-assert.python
+language: Python
+rule:
+  kind: function_definition
+  has: {field: name, regex: '^test'}
+  not:
+    has:
+      any:
+        - kind: assert_statement
+        - {kind: call, regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)'}
+      stopBy: end
+---
+id: test-without-assert.ts
+language: TypeScript
+rule:
+  kind: call_expression
+  has: {field: function, regex: '^(it|test)$'}
+  not:
+    has:
+      kind: call_expression
+      regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)'
+      stopBy: end
+---
+id: test-without-assert.tsx
+language: Tsx
+rule:
+  kind: call_expression
+  has: {field: function, regex: '^(it|test)$'}
+  not:
+    has:
+      kind: call_expression
+      regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)'
+      stopBy: end
+---
+id: test-without-assert.js
+language: JavaScript
+rule:
+  kind: call_expression
+  has: {field: function, regex: '^(it|test)$'}
+  not:
+    has:
+      kind: call_expression
+      regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)'
+      stopBy: end

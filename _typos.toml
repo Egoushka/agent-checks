@@ -1,0 +1,3 @@
+[default.extend-words]
+# shells in the shebang regex: (ba|z|da)sh
+ba = "ba"

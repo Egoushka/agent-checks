@@ -1,0 +1,43 @@
+id: empty-catch.csharp
+language: CSharp
+rule:
+  kind: catch_clause
+  has: {field: body, regex: '^\{\s*\}$'}
+  # `catch (X e) when (cond) { }` is a narrow, deliberate filter.
+  not: {has: {kind: catch_filter_clause}}
+---
+id: empty-catch.java
+language: Java
+rule:
+  kind: catch_clause
+  has: {field: body, regex: '^\{\s*\}$'}
+---
+id: empty-catch.kotlin
+language: Kotlin
+rule:
+  kind: catch_block
+  regex: '\{\s*\}\s*$'
+---
+id: empty-catch.python
+language: Python
+rule:
+  kind: except_clause
+  has: {kind: block, regex: '^(pass|\.\.\.)\s*$'}
+---
+id: empty-catch.ts
+language: TypeScript
+rule:
+  kind: catch_clause
+  has: {field: body, regex: '^\{\s*\}$'}
+---
+id: empty-catch.tsx
+language: Tsx
+rule:
+  kind: catch_clause
+  has: {field: body, regex: '^\{\s*\}$'}
+---
+id: empty-catch.js
+language: JavaScript
+rule:
+  kind: catch_clause
+  has: {field: body, regex: '^\{\s*\}$'}

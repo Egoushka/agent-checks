@@ -1,0 +1,45 @@
+# Functions that assert. Not a finding: the engine reads their names so a test
+# that calls a same-file helper such as `shows(...)` counts as asserting.
+id: assert-helper.csharp
+language: CSharp
+rule:
+  kind: method_declaration
+  has: {kind: invocation_expression, regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)', stopBy: end}
+---
+id: assert-helper.java
+language: Java
+rule:
+  kind: method_declaration
+  has: {kind: method_invocation, regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)', stopBy: end}
+---
+id: assert-helper.kotlin
+language: Kotlin
+rule:
+  kind: function_declaration
+  has: {kind: call_expression, regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)', stopBy: end}
+---
+id: assert-helper.python
+language: Python
+rule:
+  kind: function_definition
+  has:
+    any: [{kind: assert_statement}, {kind: call, regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)'}]
+    stopBy: end
+---
+id: assert-helper.ts
+language: TypeScript
+rule:
+  any: [{kind: function_declaration}, {kind: variable_declarator, has: {kind: arrow_function}}]
+  has: {kind: call_expression, regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)', stopBy: end}
+---
+id: assert-helper.tsx
+language: Tsx
+rule:
+  any: [{kind: function_declaration}, {kind: variable_declarator, has: {kind: arrow_function}}]
+  has: {kind: call_expression, regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)', stopBy: end}
+---
+id: assert-helper.js
+language: JavaScript
+rule:
+  any: [{kind: function_declaration}, {kind: variable_declarator, has: {kind: arrow_function}}]
+  has: {kind: call_expression, regex: '(?i)(assert|expect|verify|should|check|ensure|fail|throws|raises|snapshot|shot|approve|received|must|require|match|golden|compare)', stopBy: end}

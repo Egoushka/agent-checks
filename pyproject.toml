@@ -1,0 +1,40 @@
+[project]
+name = "agent-checks"
+version = "0.1.0"
+description = "Fast diff checks whose failure messages tell a coding agent what to fix: skipped tests, empty catches, silenced warnings, stubs, tests that assert nothing."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Yehor Hrabovskyi" }]
+keywords = ["pre-commit", "lefthook", "ai-agents", "claude-code", "code-quality", "ast-grep"]
+classifiers = [
+  "Environment :: Console",
+  "Topic :: Software Development :: Quality Assurance",
+  "Programming Language :: Python :: 3",
+]
+# The engines ship as wheels, so `uv tool install` gets everything in one step.
+dependencies = [
+  "ast-grep-cli>=0.39",
+  "typos>=1.30",
+  "ruff>=0.8",
+]
+
+[project.urls]
+Homepage = "https://github.com/Egoushka/agent-checks"
+
+[project.scripts]
+agent-checks = "agent_checks.cli:main"
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agent_checks"]
+
+[tool.ruff]
+line-length = 160
+target-version = "py311"
+
+[dependency-groups]
+dev = ["pytest>=8"]
