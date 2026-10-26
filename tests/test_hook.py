@@ -36,3 +36,15 @@ def test_hook_ignores_non_repo_and_bad_payload(tmp_path, monkeypatch, capsys):
     assert run_hook(monkeypatch, capsys, {"tool_input": {"file_path": str(tmp_path / "x.cs")}})[0] == 0
     monkeypatch.setattr(sys, "stdin", io.StringIO("not json"))
     assert cli.main(["hook", "claude"]) == 0
+
+
+def test_install_files_only_leaves_hooks_alone(repo):
+    repo.git("config", "core.hooksPath", ".githooks")
+    (repo.root / ".githooks").mkdir()
+    (repo.root / ".githooks" / "pre-commit").write_text("#!/bin/sh\nexit 0\n")
+    repo.git("remote", "add", "origin", "https://github.com/x/y.git")
+    assert cli.main(["install", str(repo.root), "--files-only"]) == 0
+    text = (repo.root / "lefthook.yml").read_text()
+    assert "agent-checks check --staged" in text and "run: .githooks/pre-commit" in text
+    assert "Egoushka/agent-checks@v" in (repo.root / ".github/workflows/agent-checks.yml").read_text()
+    assert repo.git("config", "--get", "core.hooksPath").strip() == ".githooks"

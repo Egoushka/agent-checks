@@ -74,6 +74,7 @@ CASES = [
     ("debug-leftover", "src/a.ts", "debugger;\nf()\n", "f()\n"),
     ("debug-leftover", "src/a.py", "breakpoint()\nf()\n", "f()\n"),
     ("merge-conflict", "src/a.txt", "<<<<<<< HEAD\na\n=======\nb\n>>>>>>> x\n", "a\n"),
+    ("merge-conflict", "docs/a.md", "text\n||||||| cd8baa8\nmore\n", "text\nmore\n"),
     ("private-key", "deploy/key.txt", "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n", "see vault://deploy/key\n"),
     ("trailing-whitespace", "src/a.py", "x = 1   \n", "x = 1\n"),
     ("final-newline", "src/a.py", "x = 1", "x = 1\n"),

@@ -56,7 +56,7 @@ needs a build. `dotnet format` runs on pre-push because it takes seconds, not mi
 ## Quick start
 
 ```bash
-uv tool install git+https://github.com/Egoushka/agent-checks@v0.1.0
+uv tool install git+https://github.com/Egoushka/agent-checks@v0.1.1
 brew install lefthook gitleaks        # the commit-hook runner and the secret scanner
 cd your-repo && agent-checks install  # writes lefthook.yml + .agent-checks.toml, installs the hooks
 agent-checks check                    # what you have staged, or the working tree against HEAD
@@ -65,9 +65,9 @@ agent-checks check                    # what you have staged, or the working tre
 In CI, on pull requests (check out at least two commits so the base is present):
 
 ```yaml
-- uses: actions/checkout@v4
+- uses: actions/checkout@v7
   with: { fetch-depth: 2 }
-- uses: Egoushka/agent-checks@v0.1.0
+- uses: Egoushka/agent-checks@v0.1.1
 ```
 
 For Claude Code, one `PostToolUse` hook on `Edit|Write|MultiEdit` that runs `agent-checks hook claude`.

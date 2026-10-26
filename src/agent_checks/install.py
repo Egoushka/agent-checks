@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from . import gitdiff
+from . import __version__, gitdiff
 
 CONFIG = """\
 # agent-checks: rules that fail with a message written to the coding agent.
@@ -51,6 +51,24 @@ pre-push:
 """
 
 
+WORKFLOW = """\
+# Checks the lines a pull request adds: https://github.com/Egoushka/agent-checks
+name: agent-checks
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  agent-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+      - uses: Egoushka/agent-checks@v{version}
+"""
+
+
 def detect(root: Path) -> set[str]:
     files = gitdiff.git(root, "ls-files").decode(errors="replace").splitlines()
     exts = {Path(f).suffix.lower() for f in files}
@@ -82,7 +100,7 @@ def legacy_hooks(root: Path) -> tuple[str | None, list[str]]:
 def render(root: Path) -> str:
     stacks = detect(root)
     hp, legacy = legacy_hooks(root)
-    out = [HEAD, "", PRE_COMMIT]
+    out = [HEAD + "\n" + PRE_COMMIT]
     if "pre-commit" in legacy:
         out[-1] += f"    - name: repo-pre-commit\n      run: {hp}/pre-commit\n"
     if "commit-msg" in legacy:
@@ -97,7 +115,7 @@ def render(root: Path) -> str:
     return "\n".join(out)
 
 
-def install(target: Path, force: bool = False, dry_run: bool = False) -> int:
+def install(target: Path, force: bool = False, dry_run: bool = False, files_only: bool = False) -> int:
     root = gitdiff.toplevel(target)
     if root is None:
         print(f"agent-checks: {target} is not a git repository")
@@ -106,6 +124,9 @@ def install(target: Path, force: bool = False, dry_run: bool = False) -> int:
     config = root / ".agent-checks.toml"
     text = render(root)
     hp, legacy = legacy_hooks(root)
+    remote = gitdiff.git(root, "remote", "get-url", "origin", check=False).decode().strip()
+    workflow = root / ".github" / "workflows" / "agent-checks.yml"
+    want_workflow = "github.com" in remote and not workflow.exists()
     plan = []
     if not config.exists():
         plan.append(f"write {config.name}")
@@ -114,9 +135,12 @@ def install(target: Path, force: bool = False, dry_run: bool = False) -> int:
     elif "agent-checks" not in lefthook_yml.read_text():
         print(f"agent-checks: {lefthook_yml} exists without an agent-checks job. Add this job to its pre-commit section, or rerun with --force:\n")
         print("    - name: agent-checks\n      run: agent-checks check --staged\n")
-    if hp:
-        plan.append(f"unset core.hooksPath={hp} (lefthook now runs {', '.join(legacy) or 'nothing'} from it)")
-    plan.append("lefthook install")
+    if want_workflow:
+        plan.append(f"write {workflow.relative_to(root)} (Egoushka/agent-checks@v{__version__} on pull requests)")
+    if not files_only:
+        if hp:
+            plan.append(f"unset core.hooksPath={hp} (lefthook now runs {', '.join(legacy) or 'nothing'} from it)")
+        plan.append("lefthook install")
     print(f"agent-checks install {root}:")
     for p in plan:
         print(f"  - {p}")
@@ -128,6 +152,12 @@ def install(target: Path, force: bool = False, dry_run: bool = False) -> int:
         config.write_text(CONFIG)
     if not lefthook_yml.exists() or force:
         lefthook_yml.write_text(text)
+    if want_workflow:
+        workflow.parent.mkdir(parents=True, exist_ok=True)
+        workflow.write_text(WORKFLOW.format(version=__version__))
+    if files_only:
+        print("files written; run `agent-checks install` again after the PR merges to activate the hooks.")
+        return 0
     if hp:
         gitdiff.git(root, "config", "--local", "--unset", "core.hooksPath", check=False)
     lh = shutil.which("lefthook")

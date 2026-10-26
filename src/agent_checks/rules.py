@@ -266,7 +266,7 @@ RULES: list[Rule] = [
         "merge-conflict",
         "A merge conflict marker.",
         "This is a leftover merge conflict marker. Resolve the conflict and remove the marker.",
-        {"*": (r"^(<{7}|>{7})( |$)",)},
+        {"*": (r"^(<{7}|>{7}|\|{7})( |$)",)},
         allowable=False,
     ),
     Rule(
