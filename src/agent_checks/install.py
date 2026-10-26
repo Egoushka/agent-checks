@@ -40,6 +40,7 @@ pre-commit:
     - name: gitleaks
       run: gitleaks git --staged --redact --no-banner
 """
+GITLEAKS_JOB = "    - name: gitleaks\n      run: gitleaks git --staged --redact --no-banner\n"
 
 DOTNET_PUSH = """\
 pre-push:
@@ -86,33 +87,41 @@ def detect(root: Path) -> set[str]:
     return stacks
 
 
-def legacy_hooks(root: Path) -> tuple[str | None, list[str]]:
+def legacy_hooks(root: Path) -> tuple[str | None, list[str], bool]:
+    """core.hooksPath, the hooks found there, and whether its pre-commit already runs gitleaks."""
     hp = gitdiff.git(root, "config", "--local", "--get", "core.hooksPath", check=False).decode().strip()
     if not hp:
-        return None, []
+        return None, [], False
     d = root / hp
-    if Path(hp).is_absolute() and Path(hp).resolve().is_relative_to(root.resolve()):
-        hp = str(Path(hp).resolve().relative_to(root.resolve()))
+    if Path(hp).is_absolute():
+        # An absolute path usually points into the main checkout; from a linked worktree, make it repo-relative.
+        common = gitdiff.git(root, "rev-parse", "--path-format=absolute", "--git-common-dir", check=False).decode().strip()
+        for base in (root, Path(common).parent if common else root):
+            if Path(hp).resolve().is_relative_to(base.resolve()):
+                hp = str(Path(hp).resolve().relative_to(base.resolve()))
+                break
     names = [p.name for p in sorted(d.iterdir()) if p.is_file() and p.name in ("pre-commit", "commit-msg", "pre-push")] if d.is_dir() else []
-    return hp, names
+    runs_gitleaks = "pre-commit" in names and "gitleaks" in (d / "pre-commit").read_text(errors="replace")
+    return hp, names, runs_gitleaks
 
 
 def render(root: Path) -> str:
     stacks = detect(root)
-    hp, legacy = legacy_hooks(root)
-    out = [HEAD + "\n" + PRE_COMMIT]
+    hp, legacy, runs_gitleaks = legacy_hooks(root)
+    pre_commit = PRE_COMMIT
+    if runs_gitleaks:
+        pre_commit = pre_commit.replace(GITLEAKS_JOB, "")
     if "pre-commit" in legacy:
-        out[-1] += f"    - name: repo-pre-commit\n      run: {hp}/pre-commit\n"
+        pre_commit += f"    # The repo's own checks; the scripts stay in {hp}/.\n    - name: repo-pre-commit\n      run: {hp}/pre-commit\n"
+    sections = [HEAD + "\n" + pre_commit]
     if "commit-msg" in legacy:
-        out += ["", f"commit-msg:\n  jobs:\n    - name: repo-commit-msg\n      run: {hp}/commit-msg {{1}}\n"]
-    if "dotnet" in stacks:
-        out += ["", DOTNET_PUSH]
+        sections.append(f"commit-msg:\n  jobs:\n    - name: repo-commit-msg\n      run: {hp}/commit-msg {{1}}\n")
+    push = DOTNET_PUSH if "dotnet" in stacks else ""
     if "pre-push" in legacy:
-        if "dotnet" in stacks:
-            out[-1] += f"    - name: repo-pre-push\n      run: {hp}/pre-push {{0}}\n"
-        else:
-            out += ["", f"pre-push:\n  jobs:\n    - name: repo-pre-push\n      run: {hp}/pre-push {{0}}\n"]
-    return "\n".join(out)
+        push = (push or "pre-push:\n  jobs:\n") + f"    - name: repo-pre-push\n      run: {hp}/pre-push {{0}}\n"
+    if push:
+        sections.append(push)
+    return "\n".join(sections)
 
 
 def install(target: Path, force: bool = False, dry_run: bool = False, files_only: bool = False) -> int:
@@ -123,7 +132,7 @@ def install(target: Path, force: bool = False, dry_run: bool = False, files_only
     lefthook_yml = root / "lefthook.yml"
     config = root / ".agent-checks.toml"
     text = render(root)
-    hp, legacy = legacy_hooks(root)
+    hp, legacy, _ = legacy_hooks(root)
     remote = gitdiff.git(root, "remote", "get-url", "origin", check=False).decode().strip()
     workflow = root / ".github" / "workflows" / "agent-checks.yml"
     want_workflow = "github.com" in remote and not workflow.exists()
