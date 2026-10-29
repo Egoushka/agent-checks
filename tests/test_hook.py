@@ -50,3 +50,21 @@ def test_install_files_only_leaves_hooks_alone(repo):
     assert "\n\n\n" not in text
     assert "Egoushka/agent-checks@v" in (repo.root / ".github/workflows/agent-checks.yml").read_text()
     assert repo.git("config", "--get", "core.hooksPath").strip() == ".githooks"
+
+
+def test_install_writes_betterleaks_and_zizmor(repo):
+    repo.write(".github/workflows/ci.yml", "name: ci\non: push\njobs: {}\n")
+    repo.git("add", "-A")
+    repo.git("commit", "-qm", "workflows")
+    assert cli.main(["install", str(repo.root), "--files-only"]) == 0
+    text = (repo.root / "lefthook.yml").read_text()
+    assert "betterleaks git --staged --redact --no-banner --disable-rule generic-password,generic-credential-uri" in text
+    assert "gitleaks" not in text
+    assert "zizmor --offline --no-progress {staged_files}" in text
+    assert "hash-pin" in (repo.root / ".github/zizmor.yml").read_text()
+
+
+def test_install_skips_zizmor_without_workflows(repo):
+    assert cli.main(["install", str(repo.root), "--files-only"]) == 0
+    assert "zizmor" not in (repo.root / "lefthook.yml").read_text()
+    assert not (repo.root / ".github/zizmor.yml").exists()
