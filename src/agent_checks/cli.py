@@ -284,7 +284,7 @@ def cmd_doctor(a) -> int:
     from .engine import tool
 
     ok = True
-    for name, need in (("git", True), ("ast-grep", True), ("typos", True), ("ruff", False), ("shellcheck", False), ("gitleaks", False), ("lefthook", False)):
+    for name, need in (("git", True), ("ast-grep", True), ("typos", True), ("ruff", False), ("shellcheck", False), ("betterleaks", False), ("zizmor", False), ("lefthook", False)):
         path = tool(name) or (tool("sg") if name == "ast-grep" else None)
         mark = "ok " if path else ("MISSING" if need else "absent")
         ok &= bool(path) or not need

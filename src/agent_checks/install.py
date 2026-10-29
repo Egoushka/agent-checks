@@ -31,16 +31,36 @@ HEAD = """\
 # agent-checks messages are written for coding agents: https://github.com/Egoushka/agent-checks
 """
 
+SECRET_JOB = """\
+    # generic-password and generic-credential-uri are off: 40 hits in 18 repos, none a live secret.
+    - name: betterleaks
+      run: betterleaks git --staged --redact --no-banner --disable-rule generic-password,generic-credential-uri
+"""
+
 PRE_COMMIT = """\
 pre-commit:
   parallel: true
   jobs:
     - name: agent-checks
       run: agent-checks check --staged
-    - name: gitleaks
-      run: gitleaks git --staged --redact --no-banner
+""" + SECRET_JOB
+
+ZIZMOR_JOB = """\
+    - name: zizmor
+      glob: ".github/workflows/*.{yml,yaml}"
+      run: zizmor --offline --no-progress {staged_files}
 """
-GITLEAKS_JOB = "    - name: gitleaks\n      run: gitleaks git --staged --redact --no-banner\n"
+
+# Third-party actions must be pinned to a SHA; GitHub's and our own may stay on a tag.
+ZIZMOR_CONFIG = """\
+rules:
+  unpinned-uses:
+    config:
+      policies:
+        actions/*: ref-pin
+        Egoushka/*: ref-pin
+        "*": hash-pin
+"""
 
 DOTNET_PUSH = """\
 pre-push:
@@ -87,8 +107,13 @@ def detect(root: Path) -> set[str]:
     return stacks
 
 
+def has_workflows(root: Path) -> bool:
+    files = gitdiff.git(root, "ls-files", ".github/workflows").decode(errors="replace").split()
+    return any(f.endswith((".yml", ".yaml")) for f in files)
+
+
 def legacy_hooks(root: Path) -> tuple[str | None, list[str], bool]:
-    """core.hooksPath, the hooks found there, and whether its pre-commit already runs gitleaks."""
+    """core.hooksPath, the hooks found there, and whether its pre-commit already runs a secret scanner."""
     hp = gitdiff.git(root, "config", "--local", "--get", "core.hooksPath", check=False).decode().strip()
     if not hp:
         return None, [], False
@@ -101,16 +126,18 @@ def legacy_hooks(root: Path) -> tuple[str | None, list[str], bool]:
                 hp = str(Path(hp).resolve().relative_to(base.resolve()))
                 break
     names = [p.name for p in sorted(d.iterdir()) if p.is_file() and p.name in ("pre-commit", "commit-msg", "pre-push")] if d.is_dir() else []
-    runs_gitleaks = "pre-commit" in names and "gitleaks" in (d / "pre-commit").read_text(errors="replace")
-    return hp, names, runs_gitleaks
+    script = (d / "pre-commit").read_text(errors="replace") if "pre-commit" in names else ""
+    return hp, names, "gitleaks" in script or "betterleaks" in script
 
 
 def render(root: Path) -> str:
     stacks = detect(root)
-    hp, legacy, runs_gitleaks = legacy_hooks(root)
+    hp, legacy, runs_scanner = legacy_hooks(root)
     pre_commit = PRE_COMMIT
-    if runs_gitleaks:
-        pre_commit = pre_commit.replace(GITLEAKS_JOB, "")
+    if runs_scanner:
+        pre_commit = pre_commit.replace(SECRET_JOB, "")
+    if has_workflows(root):
+        pre_commit += ZIZMOR_JOB
     if "pre-commit" in legacy:
         pre_commit += f"    # The repo's own checks; the scripts stay in {hp}/.\n    - name: repo-pre-commit\n      run: {hp}/pre-commit\n"
     sections = [HEAD + "\n" + pre_commit]
@@ -136,6 +163,8 @@ def install(target: Path, force: bool = False, dry_run: bool = False, files_only
     remote = gitdiff.git(root, "remote", "get-url", "origin", check=False).decode().strip()
     workflow = root / ".github" / "workflows" / "agent-checks.yml"
     want_workflow = "github.com" in remote and not workflow.exists()
+    zizmor_config = root / ".github" / "zizmor.yml"
+    want_zizmor_config = has_workflows(root) and not zizmor_config.exists()
     plan = []
     if not config.exists():
         plan.append(f"write {config.name}")
@@ -146,6 +175,8 @@ def install(target: Path, force: bool = False, dry_run: bool = False, files_only
         print("    - name: agent-checks\n      run: agent-checks check --staged\n")
     if want_workflow:
         plan.append(f"write {workflow.relative_to(root)} (Egoushka/agent-checks@v{__version__} on pull requests)")
+    if want_zizmor_config:
+        plan.append(f"write {zizmor_config.relative_to(root)} (unpinned-uses policy: SHA for third-party actions)")
     if not files_only:
         if hp:
             plan.append(f"unset core.hooksPath={hp} (lefthook now runs {', '.join(legacy) or 'nothing'} from it)")
@@ -164,6 +195,9 @@ def install(target: Path, force: bool = False, dry_run: bool = False, files_only
     if want_workflow:
         workflow.parent.mkdir(parents=True, exist_ok=True)
         workflow.write_text(WORKFLOW.format(version=__version__))
+    if want_zizmor_config:
+        zizmor_config.parent.mkdir(parents=True, exist_ok=True)
+        zizmor_config.write_text(ZIZMOR_CONFIG)
     if files_only:
         print("files written; run `agent-checks install` again after the PR merges to activate the hooks.")
         return 0
