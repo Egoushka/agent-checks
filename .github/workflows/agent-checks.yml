@@ -10,6 +10,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
+          persist-credentials: false
           fetch-depth: 2
       # This repo tests its own action from the PR checkout.
-      - uses: ./
+      - uses: ./  # zizmor: ignore[self-repository] this repo tests its own action from the PR checkout
