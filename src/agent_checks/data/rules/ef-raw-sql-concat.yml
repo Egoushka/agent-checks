@@ -1,0 +1,16 @@
+id: ef-raw-sql-concat.csharp
+language: CSharp
+rule:
+  kind: invocation_expression
+  all:
+    - has:
+        field: function
+        regex: '(FromSqlRaw|ExecuteSqlRaw|ExecuteSqlRawAsync|SqlQueryRaw)(<.*>)?$'
+    - has:
+        field: arguments
+        has:
+          kind: argument
+          nthChild: 1
+          any:
+            - has: {kind: binary_expression}
+            - has: {kind: invocation_expression, regex: '^(string|String)\.Format'}

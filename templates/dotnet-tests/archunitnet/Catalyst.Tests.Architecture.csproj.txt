@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>Catalyst.Tests.Architecture</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Using Include="Xunit" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+        <PackageReference Include="TngTech.ArchUnitNET.xUnitV3" Version="0.13.5" />
+        <PackageReference Include="xunit.v3" Version="3.0.0" />
+        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.2" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\..\Catalyst.Api\Catalyst.Api.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Catalyst.Application\Catalyst.Application.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Catalyst.Common\Catalyst.Common.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Catalyst.Data\Catalyst.Data.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Catalyst.Data.Abstraction\Catalyst.Data.Abstraction.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Catalyst.Domain\Catalyst.Domain.csproj" />
+        <ProjectReference Include="..\..\Infrastructure\Catalyst.SharedKernel\Catalyst.SharedKernel.csproj" />
+        <ProjectReference Include="..\..\Modules\Catalyst.ExampleModule\Catalyst.ExampleModule.csproj" />
+        <ProjectReference Include="..\..\Modules\Catalyst.Notifications\Catalyst.Notifications.csproj" />
+        <ProjectReference Include="..\..\Modules\Catalyst.Users\Catalyst.Users.csproj" />
+    </ItemGroup>
+
+</Project>

@@ -1,0 +1,18 @@
+<Project>
+
+  <!-- Restore-time settings. Must live in the repo: NuGet evaluates them before package props exist.
+       The weakened-gate rule flags a change that sets NuGetAudit or RestoreLockedMode to false. -->
+  <PropertyGroup>
+    <!-- Reproducible restores; osv-scanner reads packages.lock.json. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(GITHUB_ACTIONS)' == 'true'">true</RestoreLockedMode>
+
+    <!-- Built-in SCA: NU1901-NU1904 for vulnerable direct AND transitive packages. -->
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+    <!-- High/critical advisories fail the CI restore itself. -->
+    <WarningsAsErrors Condition="'$(GITHUB_ACTIONS)' == 'true'">$(WarningsAsErrors);NU1903;NU1904</WarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

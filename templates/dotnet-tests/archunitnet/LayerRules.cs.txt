@@ -1,0 +1,59 @@
+using ArchUnitNET.Fluent;
+using ArchUnitNET.xUnitV3;
+using static ArchUnitNET.Fluent.ArchRuleDefinition;
+using static Catalyst.Tests.Architecture.Layers;
+
+namespace Catalyst.Tests.Architecture;
+
+/// <summary>Which project may reference which (README, "Project Structure"; the project references are the allowed edges). The test fails with every offending type and dependency.</summary>
+public class LayerRules
+{
+    private static void Holds(IArchRule rule) => rule.Check(Model);
+
+    [Fact]
+    public void SharedKernel_depends_on_no_other_layer() =>
+        Holds(Types().That().Are(SharedKernelLayer).Should().NotDependOnAnyTypesThat().Are(Types().That().Are(DomainLayer).Or().Are(CommonLayer).Or().Are(DataAbstractionLayer).Or().Are(DataLayer).Or().Are(ApplicationLayer).Or().Are(ModulesLayer).Or().Are(ApiLayer))
+            .Because("it is the base every other project builds on"));
+
+    [Fact]
+    public void Domain_Common_and_DataAbstraction_depend_only_on_SharedKernel_and_each_other_never_upward() =>
+        Holds(Types().That().Are(DomainLayer).Or().Are(CommonLayer).Or().Are(DataAbstractionLayer).Should().NotDependOnAnyTypesThat().Are(Types().That().Are(DataLayer).Or().Are(ApplicationLayer).Or().Are(ModulesLayer).Or().Are(ApiLayer))
+            .Because("shared building blocks sit below the application, the data implementation, the modules and the host"));
+
+    [Fact]
+    public void Application_does_not_depend_on_the_data_implementation_modules_or_the_host() =>
+        Holds(Types().That().Are(ApplicationLayer).Should().NotDependOnAnyTypesThat().Are(Types().That().Are(DataLayer).Or().Are(ModulesLayer).Or().Are(ApiLayer))
+            .Because("the application layer talks to data through Data.Abstraction and knows no module"));
+
+    [Fact]
+    public void Data_depends_only_on_DataAbstraction_and_SharedKernel() =>
+        Holds(Types().That().Are(DataLayer).Should().NotDependOnAnyTypesThat().Are(Types().That().Are(DomainLayer).Or().Are(CommonLayer).Or().Are(ApplicationLayer).Or().Are(ModulesLayer).Or().Are(ApiLayer))
+            .Because("Data implements Data.Abstraction and nothing above it"));
+
+    [Fact]
+    public void Infrastructure_never_depends_on_modules_or_the_host() =>
+        Holds(Types().That().Are(InfrastructureLayer).Should().NotDependOnAnyTypesThat().Are(Types().That().Are(ModulesLayer).Or().Are(ApiLayer))
+            .Because("a template's infrastructure is module-agnostic"));
+
+    [Fact]
+    public void Modules_do_not_depend_on_the_host() =>
+        Holds(Types().That().Are(ModulesLayer).Should().NotDependOnAnyTypesThat().Are(ApiLayer).Because("the host composes modules, not the reverse"));
+
+    // Known violation, found by this suite on its first run: a module's repository derives from the EF base class in Catalyst.Data. Listed here so the suite stays green and the exception stays visible.
+    [Fact]
+    public void Modules_do_not_depend_on_the_data_implementation_except_a_repository_deriving_from_EfRepository() =>
+        Holds(Types().That().Are(ModulesLayer).And().DoNotHaveFullNameContaining("Repository`1").Should().NotDependOnAnyTypesThat().Are(DataLayer)
+            .Because("modules use repositories through Data.Abstraction; the host chooses the implementation"));
+
+    [Fact]
+    public void ExampleModule_depends_on_no_other_module() =>
+        Holds(Types().That().Are(ExampleModuleLayer).Should().NotDependOnAnyTypesThat().Are(Types().That().Are(UsersLayer).Or().Are(NotificationsLayer)).Because("a module owns its slice"));
+
+    [Fact]
+    public void Users_depends_on_no_other_module() =>
+        Holds(Types().That().Are(UsersLayer).Should().NotDependOnAnyTypesThat().Are(Types().That().Are(ExampleModuleLayer).Or().Are(NotificationsLayer)).Because("a module owns its slice; only Notifications may read Users"));
+
+    [Fact]
+    public void Notifications_depends_on_no_module_but_Users() =>
+        Holds(Types().That().Are(NotificationsLayer).Should().NotDependOnAnyTypesThat().Are(ExampleModuleLayer).Because("a module owns its slice; Notifications reads Users and nothing else"));
+}

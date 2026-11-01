@@ -1,0 +1,29 @@
+using ArchUnitNET.Domain;
+using ArchUnitNET.Fluent;
+using static Catalyst.Tests.Architecture.Layers;
+
+namespace Catalyst.Tests.Architecture;
+
+/// <summary>A rule over a layer that matched no types would pass without checking anything: each layer must find its assembly's types.</summary>
+public class LayersAreNotEmptyTests
+{
+    public static TheoryData<string> LayerNames => new() { "SharedKernel", "Domain", "Common", "DataAbstraction", "Data", "Application", "ExampleModule", "Users", "Notifications", "Api" };
+
+    private static IObjectProvider<IType> ByName(string name) => name switch
+    {
+        "SharedKernel" => SharedKernelLayer,
+        "Domain" => DomainLayer,
+        "Common" => CommonLayer,
+        "DataAbstraction" => DataAbstractionLayer,
+        "Data" => DataLayer,
+        "Application" => ApplicationLayer,
+        "ExampleModule" => ExampleModuleLayer,
+        "Users" => UsersLayer,
+        "Notifications" => NotificationsLayer,
+        _ => ApiLayer,
+    };
+
+    [Theory]
+    [MemberData(nameof(LayerNames))]
+    public void Each_layer_has_types(string name) => Assert.NotEmpty(ByName(name).GetObjects(Model));
+}
