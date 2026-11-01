@@ -13,6 +13,8 @@ from dataclasses import dataclass, field
 C_LIKE = ("csharp", "kotlin", "java", "ts", "js", "go", "rust", "swift")
 CODE = C_LIKE + ("python", "shell")
 
+COMPOSE_FILE = r"(^|/)[^/]*compose[^/]*\.ya?ml$"
+
 ALLOW_HINT = "If this is deliberate, put `agent-checks: allow {id} -- <why>` in a comment on this line or the one above."
 
 
@@ -24,6 +26,10 @@ class Rule:
     # lang -> regexes; "*" applies to every file. Empty for AST and file-level rules.
     patterns: dict[str, tuple[str, ...]] = field(default_factory=dict)
     tests_only: bool = False
+    # The rule is skipped in test files (production-code conventions).
+    skip_tests: bool = False
+    # Regex on the file path; the rule applies only to matching files (compose files, for instance).
+    paths: str | None = None
     # A match is dropped when one of the 3 lines above it matches this.
     unless_above: str | None = None
     # A match is dropped when its own line matches this (a suppression that carries its reason).
@@ -193,7 +199,14 @@ RULES: list[Rule] = [
         "A quality gate is turned down: warnings allowed, strict mode off, failures ignored.",
         "You weakened a quality gate (warnings as errors, nullable, strict mode, a failing CI step or hook). Make the code pass the gate instead.",
         {
-            "msbuild": (r"<TreatWarningsAsErrors>\s*false", r"<Nullable>\s*(disable|warnings)", r"<WarningsNotAsErrors>", r"<EnforceCodeStyleInBuild>\s*false"),
+            "msbuild": (
+                r"<TreatWarningsAsErrors>\s*false",
+                r"<Nullable>\s*(disable|warnings)",
+                r"<WarningsNotAsErrors>",
+                r"<EnforceCodeStyleInBuild>\s*false",
+                r"<NuGetAudit>\s*false",
+                r"<RestoreLockedMode>\s*false",
+            ),
             "yaml": (
                 r"\bcontinue-on-error:\s*true",
                 r"\|\|\s*true\b",
@@ -260,6 +273,81 @@ RULES: list[Rule] = [
             "kotlin": (r"\.printStackTrace\s*\(\s*\)",),
             "java": (r"\.printStackTrace\s*\(\s*\)",),
         },
+    ),
+    # --- ported from the retired engineering-standards repo ---
+    Rule(
+        "ef-raw-sql-concat",
+        "SQL built by concatenation or string.Format and passed to a raw-SQL EF Core call.",
+        "This SQL is built from strings, so a value in it can inject SQL. Use FromSql($\"...\") or ExecuteSql($\"...\") "
+        "so each interpolated value becomes a parameter, or pass the values as FromSqlRaw/ExecuteSqlRaw parameters.",
+        kind="ast",
+    ),
+    Rule(
+        "new-httpclient",
+        "`new HttpClient()` in application code.",
+        "A `new HttpClient()` per use leaks sockets or ignores DNS changes. "
+        "Inject IHttpClientFactory, or a typed client registered with AddHttpClient<T>().",
+        {"csharp": (r"\bnew\s+(System\.Net\.Http\.)?HttpClient\s*\(",)},
+        skip_tests=True,
+        severity="warn",
+    ),
+    Rule(
+        "banned-time-api",
+        "DateTime.Now/UtcNow or DateTimeOffset.Now/UtcNow in application code.",
+        "Reading the clock directly makes the code untestable. Inject TimeProvider and use GetUtcNow() (or GetLocalNow()).",
+        {"csharp": (r"\bDateTime(Offset)?\.(Utc)?Now\b",)},
+        skip_tests=True,
+        severity="warn",
+    ),
+    Rule(
+        "sync-over-async",
+        "Blocking on a task with .Result, .Wait() or GetAwaiter().GetResult().",
+        "Blocking on a task can deadlock and hides the real exception. Make the caller async and await the task.",
+        {"csharp": (r"\)\s*\.(Result\b|Wait\s*\(\s*\))", r"\.GetAwaiter\s*\(\s*\)\s*\.GetResult\s*\(")},
+        unless_line=r"\bawait\b",
+        skip_tests=True,
+        severity="warn",
+    ),
+    Rule(
+        "gc-collect",
+        "A forced garbage collection.",
+        "Do not force a collection in application code; it stalls every thread and rarely frees what you expect. Fix what holds the memory.",
+        {"csharp": (r"\bGC\.Collect\s*\(",)},
+        skip_tests=True,
+        severity="warn",
+    ),
+    Rule(
+        "log-interpolation",
+        "An interpolated string used as a log message template.",
+        "An interpolated log message defeats structured logging and allocates even when the level is off. "
+        'Use a constant template with placeholders: logger.LogInformation("Saved {Count} items", count).',
+        {"csharp": (r"\.Log(Trace|Debug|Information|Warning|Error|Critical)\s*\(\s*([\w.]+\s*,\s*)?\$@?\"",)},
+        skip_tests=True,
+        severity="warn",
+    ),
+    Rule(
+        "compose-docker-socket-mount",
+        "A Compose service mounts the Docker socket.",
+        "Mounting the Docker socket gives this container root on the host. If it only needs to read container state, "
+        "put tecnativa/docker-socket-proxy in front of it with the minimum API sections enabled.",
+        {"yaml": (r"/run/docker\.sock:",)},
+        paths=COMPOSE_FILE,
+    ),
+    Rule(
+        "compose-privileged",
+        "A Compose service runs privileged.",
+        "A privileged container can escape to the host. Grant the specific capabilities it needs with cap_add instead.",
+        {"yaml": (r"^\s*privileged:\s*true\b",)},
+        paths=COMPOSE_FILE,
+    ),
+    Rule(
+        "compose-port-on-all-interfaces",
+        "A Compose service publishes a port on every interface.",
+        "A published port without a host IP binds 0.0.0.0, and Docker's iptables rules bypass UFW, so it is reachable from the internet. "
+        "Bind it to 127.0.0.1 or the Tailscale IP, or keep the service on an internal network behind the reverse proxy.",
+        {"yaml": (r"""^\s*-\s*["']?(0\.0\.0\.0:)?\d{1,5}(-\d{1,5})?:\d{1,5}(-\d{1,5})?(/(tcp|udp))?["']?\s*(#.*)?$""",)},
+        paths=COMPOSE_FILE,
+        severity="warn",
     ),
     # --- hygiene (ports of the pre-commit-hooks basics) ---
     Rule(

@@ -39,10 +39,13 @@ every edit, and strict only about lines the change adds, so old code never block
 
 - Checks only the lines a change adds: staged changes, a branch against its base, one commit, or one file
   right after an agent edits it.
-- 28 rules in C#, Kotlin, Java, Python, TypeScript/JavaScript, Go and shell: skipped, focused or
+- 37 rules in C#, Kotlin, Java, Python, TypeScript/JavaScript, Go, Compose files and shell: skipped, focused or
   tautological tests, tests without an assertion, fixed sleeps in tests, deleted tests and assertions,
   empty catches, `throw ex;`, `async void`, silenced warnings, weakened quality gates, stubs, TODOs
-  without an issue, commented-out code, debugger leftovers, conflict markers, private keys, `.env` files.
+  without an issue, commented-out code, debugger leftovers, conflict markers, private keys, `.env` files,
+  and from the retired engineering-standards repo: raw EF SQL built from strings, `new HttpClient()`,
+  `DateTime.UtcNow`, sync-over-async, interpolated log templates, and Compose files that mount the
+  Docker socket, run privileged or publish a port on every interface.
 - Runs typos, ruff and shellcheck and keeps only what they report on added lines, so a repo can adopt them
   without fixing its history first.
 - Every failure message is an instruction: what is wrong and what to do instead. A deliberate exception
@@ -56,7 +59,7 @@ needs a build. `dotnet format` runs on pre-push because it takes seconds, not mi
 ## Quick start
 
 ```bash
-uv tool install git+https://github.com/Egoushka/agent-checks@v0.1.4
+uv tool install git+https://github.com/Egoushka/agent-checks@v0.1.5
 brew install lefthook betterleaks zizmor  # the commit-hook runner, the secret scanner, the workflow linter
 cd your-repo && agent-checks install  # writes lefthook.yml + .agent-checks.toml, installs the hooks
 agent-checks check                    # what you have staged, or the working tree against HEAD
@@ -67,7 +70,7 @@ In CI, on pull requests (check out at least two commits so the base is present):
 ```yaml
 - uses: actions/checkout@v7
   with: { fetch-depth: 2 }
-- uses: Egoushka/agent-checks@v0.1.4
+- uses: Egoushka/agent-checks@v0.1.5
 ```
 
 For Claude Code, one `PostToolUse` hook on `Edit|Write|MultiEdit` that runs `agent-checks hook claude`.
@@ -106,10 +109,19 @@ the error rules fired 22 times: 13 fixed delays in tests, 6 suppressions without
 220 findings; the drop came from moving typos and whitespace to warnings, reading assertion helpers
 (`shows(...)`, `EnsureParsed(...)`) as assertions, and counting moved tests as moves.
 
+The nine rules ported from engineering-standards were replayed over the last 40 commits of homelab-gitops,
+chargehand, feed-eater and nytka server: 7 hits, all genuine uses of the flagged API (6 `DateTimeOffset.UtcNow`,
+1 `new HttpClient` with a custom handler); an audit of every tracked line found one false hit (an `await`ed
+`.Result`) and one comment naming `docker.sock`, both fixed. All but the two error-level Compose rules and
+the raw-SQL rule start as `warn`.
+
 ## Docs
 
 - [docs/rules.md](docs/rules.md): every rule, its scope and whether a marker can allow it, plus the
   config file.
+- [templates/](templates): copyable scaffolds that are not diff checks: NuGet and `Directory.Build.props`
+  settings, a Stryker workflow, .NET test tooling (ArchUnitNET, Coyote, hurl, oasdiff) and Dependabot
+  auto-merge.
 - [docs/beyond.md](docs/beyond.md): what else raises agent code quality (diff coverage, mutation testing
   on changed code, snapshots, property tests), ranked with a recommendation.
 

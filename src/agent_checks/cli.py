@@ -250,6 +250,10 @@ def cmd_rules(a) -> int:
         print("| Rule | Catches | Scope | Allow marker |\n|---|---|---|---|")
         for r in R.RULES:
             scope = "test files" if r.tests_only else ("whole change" if r.kind == "file" else "added lines")
+            if r.skip_tests:
+                scope += ", not tests"
+            if r.paths:
+                scope += ", Compose files"
             print(f"| `{r.id}` | {r.summary} | {scope} | {'yes' if r.allowable else 'no'} |")
         return 0
     for r in R.RULES:

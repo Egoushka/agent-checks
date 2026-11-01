@@ -66,6 +66,12 @@ CASES = [
         "jobs:\n  t:\n    steps:\n      - run: dotnet test\n        continue-on-error: true\n",
         "jobs:\n  t:\n    steps:\n      - run: dotnet test\n",
     ),
+    (
+        "weakened-gate",
+        "Directory.Build.props",
+        "<Project><PropertyGroup><NuGetAudit>false</NuGetAudit></PropertyGroup></Project>\n",
+        "<Project><PropertyGroup><NuGetAudit>true</NuGetAudit></PropertyGroup></Project>\n",
+    ),
     ("stub", "src/A.cs", "public int F() => throw new NotImplementedException();\n", "public int F() => 1;\n"),
     ("stub", "src/a.py", "def f():\n    raise NotImplementedError\n", "def f():\n    return 1\n"),
     ("todo-comment", "src/A.cs", "// TODO: handle retries\nvar x = 1;\n", "// TODO(#42): handle retries\nvar x = 1;\n"),
@@ -82,6 +88,49 @@ CASES = [
     ("typo", "src/a.py", "# teh value\nx = 1\n", "# the value\nx = 1\n"),
     ("ruff", "src/a.py", "def f():\n    return undefined_name\n", "def f(undefined_name):\n    return undefined_name\n"),
     (
+        "ef-raw-sql-concat",
+        "src/Repo.cs",
+        'class R { void M() { db.Users.FromSqlRaw("SELECT * FROM Users WHERE Name = \'" + name + "\'"); } }\n',
+        'class R { void M() { db.Users.FromSql($"SELECT * FROM Users WHERE Name = {name}"); } }\n',
+    ),
+    (
+        "ef-raw-sql-concat",
+        "src/Repo.cs",
+        'class R { void M() { db.Database.ExecuteSqlRaw(string.Format("DELETE FROM T WHERE Id = {0}", id)); } }\n',
+        'class R { void M() { db.Database.ExecuteSqlRaw("DELETE FROM T WHERE Id = {0}", id); } }\n',
+    ),
+    ("new-httpclient", "src/Client.cs", "class C { HttpClient h = new HttpClient(); }\n", "class C { C(IHttpClientFactory f) { h = f.CreateClient(); } }\n"),
+    ("banned-time-api", "src/Clock.cs", "class C { DateTime T() => DateTime.UtcNow; }\n", "class C { DateTimeOffset T() => time.GetUtcNow(); }\n"),
+    ("sync-over-async", "src/A.cs", "class A { int M() => Load().Result; }\n", "class A { async Task<int> M() => await Load(); }\n"),
+    ("sync-over-async", "src/A.cs", "class A { void M() { Save().GetAwaiter().GetResult(); } }\n", "class A { async Task M() { await Save(); } }\n"),
+    ("sync-over-async", "src/A.cs", "class A { int M() => Load().Wait(); }\n", "class A { async Task<int> M() => (await Load()).Result; }\n"),
+    ("gc-collect", "src/A.cs", "class A { void M() { GC.Collect(); } }\n", "class A { void M() { } }\n"),
+    (
+        "log-interpolation",
+        "src/A.cs",
+        'class A { void M() { logger.LogInformation($"Saved {count} items"); } }\n',
+        'class A { void M() { logger.LogInformation("Saved {Count} items", count); } }\n',
+    ),
+    (
+        "compose-docker-socket-mount",
+        "stacks/app/docker-compose.yml",
+        "services:\n  a:\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock:ro\n",
+        "services:\n  a:\n    environment:\n      DOCKER_HOST: tcp://socket-proxy:2375\n",
+    ),
+    ("compose-privileged", "compose.yaml", "services:\n  a:\n    privileged: true\n", "services:\n  a:\n    cap_add:\n      - NET_ADMIN\n"),
+    (
+        "compose-port-on-all-interfaces",
+        "docker-compose.yml",
+        'services:\n  a:\n    ports:\n      - "8080:80"\n',
+        'services:\n  a:\n    ports:\n      - "127.0.0.1:8080:80"\n',
+    ),
+    (
+        "compose-port-on-all-interfaces",
+        "docker-compose.yml",
+        "services:\n  a:\n    ports:\n      - 5432:5432\n",
+        'services:\n  a:\n    ports:\n      - "100.64.0.5:3000:3000"\n',
+    ),
+    (
         "allow-without-reason",
         "src/A.cs",
         "#pragma warning disable CS1 // agent-checks: allow suppress-warning\n",
@@ -90,7 +139,17 @@ CASES = [
 ]
 
 
-WARN = {"typo", "final-newline", "trailing-whitespace"}
+WARN = {
+    "typo",
+    "final-newline",
+    "trailing-whitespace",
+    "new-httpclient",
+    "banned-time-api",
+    "sync-over-async",
+    "gc-collect",
+    "log-interpolation",
+    "compose-port-on-all-interfaces",
+}
 
 
 @pytest.mark.parametrize("rule,path,bad,good", CASES, ids=[f"{c[0]}:{c[1]}" for c in CASES])
@@ -248,3 +307,15 @@ def test_base_from_env(repo, monkeypatch):
     assert repo.rules() == ["async-void"]
     # An explicit mode wins over the environment.
     assert repo.rules("--commit", base) == []
+
+
+def test_new_httpclient_is_fine_in_tests(repo):
+    repo.write("tests/ClientTests.cs", "class C { HttpClient h = new HttpClient(); }\n")
+    repo.git("add", "-A")
+    assert "new-httpclient" not in repo.rules("--staged", key="warnings")
+
+
+def test_compose_rules_ignore_other_yaml(repo):
+    repo.write("k8s/app.yml", "spec:\n  privileged: true\n  ports:\n    - 8080:80\n")
+    repo.git("add", "-A")
+    assert not {"compose-privileged", "compose-port-on-all-interfaces"} & set(repo.rules("--staged", key="findings") + repo.rules("--staged", key="warnings"))

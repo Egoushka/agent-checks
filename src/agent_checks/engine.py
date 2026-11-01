@@ -338,6 +338,10 @@ class Checker:
             rule = R.BY_ID[rid]
             if rule.tests_only and not is_test:
                 continue
+            if rule.skip_tests and is_test:
+                continue
+            if rule.paths and not re.search(rule.paths, c.path):
+                continue
             pats = by_lang.get(lang, []) + by_lang.get("*", [])
             if not pats:
                 continue

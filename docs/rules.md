@@ -21,11 +21,20 @@ assertions, file size, `.env`, scope), which look at the change as a whole. `err
 | `rethrow-loses-stack` | `throw ex;` resets the stack trace. | added lines | yes | error |
 | `async-void` | An `async void` method outside an event handler. | added lines | yes | error |
 | `suppress-warning` | A compiler, analyzer or linter warning is silenced. | added lines | yes | error |
-| `weakened-gate` | A quality gate is turned down: warnings allowed, strict mode off, failures ignored. | added lines | yes | error |
+| `weakened-gate` | A quality gate is turned down: warnings allowed, strict mode off, failures ignored, NuGet audit or locked restore off. | added lines | yes | error |
 | `stub` | Unfinished code: a not-implemented stub. | added lines | yes | error |
 | `todo-comment` | A TODO/FIXME without an issue reference. | added lines | yes | error |
 | `commented-out-code` | Code left in a comment. | added lines | yes | error |
 | `debug-leftover` | A debugger statement or breakpoint left in. | added lines | yes | error |
+| `ef-raw-sql-concat` | SQL built by concatenation or string.Format and passed to a raw-SQL EF Core call. | added lines | yes | error |
+| `new-httpclient` | `new HttpClient()` in application code. | added lines, not tests | yes | warn |
+| `banned-time-api` | DateTime.Now/UtcNow or DateTimeOffset.Now/UtcNow in application code. | added lines, not tests | yes | warn |
+| `sync-over-async` | Blocking on a task with .Result, .Wait() or GetAwaiter().GetResult(). | added lines, not tests | yes | warn |
+| `gc-collect` | A forced garbage collection. | added lines, not tests | yes | warn |
+| `log-interpolation` | An interpolated string used as a log message template. | added lines, not tests | yes | warn |
+| `compose-docker-socket-mount` | A Compose service mounts the Docker socket. | added lines, Compose files | yes | error |
+| `compose-privileged` | A Compose service runs privileged. | added lines, Compose files | yes | error |
+| `compose-port-on-all-interfaces` | A Compose service publishes a port on every interface. | added lines, Compose files | yes | warn |
 | `merge-conflict` | A merge conflict marker. | added lines | no | error |
 | `private-key` | A private key in the change. | added lines | no | error |
 | `trailing-whitespace` | Trailing whitespace. | added lines | yes | warn |

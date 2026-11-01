@@ -1,0 +1,31 @@
+name: openapi
+
+on:
+  pull_request:
+    paths: ['api/openapi.yaml']
+
+permissions:
+  contents: read
+
+jobs:
+  breaking:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install oasdiff (pinned by SHA-256)
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          cd "$RUNNER_TEMP"
+          curl -sSfLo oasdiff.tgz https://github.com/oasdiff/oasdiff/releases/download/v1.35.0/oasdiff_1.35.0_linux_amd64.tar.gz
+          echo "a8023002fcb2eaa7f5758148a9303cb63d33b939886df312268bc0fc7b939140  oasdiff.tgz" | sha256sum -c -
+          tar -xzf oasdiff.tgz -C bin oasdiff
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      - name: No breaking change against the base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: scripts/openapi-breaking.sh "origin/$BASE_REF"

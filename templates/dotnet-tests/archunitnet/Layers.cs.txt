@@ -1,0 +1,33 @@
+using ArchUnitNET.Domain;
+using ArchUnitNET.Fluent;
+using ArchUnitNET.Loader;
+using static ArchUnitNET.Fluent.ArchRuleDefinition;
+
+namespace Catalyst.Tests.Architecture;
+
+/// <summary>The solution's assemblies as ArchUnitNET layers. A layer is the types of one project; the rules in <see cref="LayerRules"/> say which layers may reference which.</summary>
+internal static class Layers
+{
+    public static readonly ArchUnitNET.Domain.Architecture Model = new ArchLoader().LoadAssemblies(
+        Load("Catalyst.SharedKernel"), Load("Catalyst.Domain"), Load("Catalyst.Common"), Load("Catalyst.Data.Abstraction"), Load("Catalyst.Data"), Load("Catalyst.Application"),
+        Load("Catalyst.ExampleModule"), Load("Catalyst.Users"), Load("Catalyst.Notifications"), Load("Catalyst.Api")).Build();
+
+    private static System.Reflection.Assembly Load(string name) => System.Reflection.Assembly.Load(name);
+
+    private static IObjectProvider<IType> Of(string assembly) => Types().That().ResideInAssembly(Load(assembly)).As(assembly);
+
+    public static readonly IObjectProvider<IType> SharedKernelLayer = Of("Catalyst.SharedKernel");
+    public static readonly IObjectProvider<IType> DomainLayer = Of("Catalyst.Domain");
+    public static readonly IObjectProvider<IType> CommonLayer = Of("Catalyst.Common");
+    public static readonly IObjectProvider<IType> DataAbstractionLayer = Of("Catalyst.Data.Abstraction");
+    public static readonly IObjectProvider<IType> DataLayer = Of("Catalyst.Data");
+    public static readonly IObjectProvider<IType> ApplicationLayer = Of("Catalyst.Application");
+    public static readonly IObjectProvider<IType> ExampleModuleLayer = Of("Catalyst.ExampleModule");
+    public static readonly IObjectProvider<IType> UsersLayer = Of("Catalyst.Users");
+    public static readonly IObjectProvider<IType> NotificationsLayer = Of("Catalyst.Notifications");
+    public static readonly IObjectProvider<IType> ApiLayer = Of("Catalyst.Api");
+
+    public static IObjectProvider<IType> ModulesLayer { get; } = Types().That().Are(ExampleModuleLayer).Or().Are(UsersLayer).Or().Are(NotificationsLayer).As("Modules");
+
+    public static IObjectProvider<IType> InfrastructureLayer { get; } = Types().That().Are(SharedKernelLayer).Or().Are(DomainLayer).Or().Are(CommonLayer).Or().Are(DataAbstractionLayer).Or().Are(DataLayer).Or().Are(ApplicationLayer).As("Infrastructure");
+}

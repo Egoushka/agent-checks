@@ -30,7 +30,7 @@ means no test would catch that bug. This is the direct answer to "tests that ass
 the failure chargehand's baseline found. Full runs are slow, so run it only on what the PR changes:
 Stryker.NET has a `--since` mode that mutates code changed against a target branch
 ([Stryker docs](https://stryker-mutator.io/blog/azure-pipelines-integration/)), and
-engineering-standards already ships a `mutation.yml` reusable workflow. Wire it as a PR job with a
+[`templates/dotnet/mutation.yml`](../templates/dotnet/mutation.yml) is a ready workflow for it. Wire it as a PR job with a
 break threshold on the changed files (start at 0, report only, then raise to 60). StrykerJS covers the
 TypeScript repos the same way; PIT works for Kotlin/JVM but is heavier on Android.
 
