@@ -19,9 +19,32 @@ Fail the PR when less than N% of the lines it adds are executed by tests. An age
 without tests, or a test that never reaches the new branch, fails here. It reuses the coverage report the
 test run already produces: Coverlet (`--collect "XPlat Code Coverage"`) for .NET, Kover or JaCoCo for
 Kotlin, c8 or Vitest for TypeScript, pytest-cov for Python, all of which can write Cobertura XML.
-[diff-cover](https://github.com/Bachmann1234/diff_cover) reads that XML plus `git diff` and reports the
-changed lines' coverage; set its fail-under threshold to 80 for new code. Start at report-only for a week
-to see the baseline.
+
+`agent-checks diffcover` reads that XML plus the same added-line map the rules use and reports the
+changed lines' coverage. It is stdlib only, so it adds no dependency to the kit;
+[diff-cover](https://github.com/Bachmann1234/diff_cover) does the same job and is the cross-check.
+
+```bash
+pytest --cov=mypkg --cov-report=xml        # any runner that writes Cobertura XML
+agent-checks diffcover --base auto --report-only      # week one: print, never fail
+agent-checks diffcover --base auto                    # then fail under 80
+```
+
+A line the report does not list (blank, comment, signature) does not count; a changed file the report
+does not mention is named in the summary but not counted. The failure message lists the unrun lines as
+`path:3-4` and, with `--format github`, annotates each one.
+
+**Check.** On a PR, the share of added executable lines that tests run is at least 80%.
+Measured by `agent-checks diffcover` over the PR's diff and the test run's `coverage.xml`.
+
+**Stop.** Drop back to `--report-only` (or remove the step) if, after the first week of report-only data,
+either (a) more than 1 in 5 PRs that would fail do so on lines not worth a test (generated code, thin
+glue, platform entry points), or (b) the step adds more than 10 seconds to a PR run. Raise the threshold
+only after a month under 80 with no stop line hit. All three numbers, 80, 20% and 10 s, are starting
+values from this document, not calibrated ones; replace them with the week's data.
+
+**This repo.** `ci.yml` runs the gate on pull requests in report-only mode from 2026-11-07. The week
+ends 2026-11-14; read the PR logs, then drop `--report-only` or apply the stop line.
 
 ## 2. Mutation testing on changed code
 

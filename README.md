@@ -63,6 +63,7 @@ uv tool install git+https://github.com/Egoushka/agent-checks@v0.1.5
 brew install lefthook betterleaks zizmor  # the commit-hook runner, the secret scanner, the workflow linter
 cd your-repo && agent-checks install  # writes lefthook.yml + .agent-checks.toml, installs the hooks
 agent-checks check                    # what you have staged, or the working tree against HEAD
+agent-checks diffcover --base origin/main  # share of added lines your tests run, from coverage.xml (docs/beyond.md)
 ```
 
 In CI, on pull requests (check out at least two commits so the base is present):
