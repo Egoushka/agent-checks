@@ -100,9 +100,8 @@ def parse_diff(text: str) -> list[FileChange]:
         elif line.startswith("-"):
             cur.removed.append(line[1:])
             last_plus = False
-        elif line.startswith("\\"):
-            if last_plus:
-                cur.no_final_newline = True
+        elif line.startswith("\\") and last_plus:
+            cur.no_final_newline = True
     return changes
 
 

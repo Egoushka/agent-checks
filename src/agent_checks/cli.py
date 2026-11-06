@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import __version__, gitdiff, install
+from . import __version__, diffcover, gitdiff, install
 from . import rules as R
 from .engine import Checker, Config, Finding, Result
 
@@ -38,6 +38,14 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--timing", action="store_true", help="print timings to stderr")
     c.add_argument("paths", nargs="*", help="limit to these paths")
 
+    d = sub.add_parser("diffcover", help="fail when too few of the executable lines a change adds are run by tests")
+    d.add_argument("-C", dest="dir", default=".", help="run in this directory")
+    d.add_argument("--coverage", default="coverage.xml", metavar="FILE", help="Cobertura XML written by the test run (default: coverage.xml)")
+    d.add_argument("--base", metavar="REF", help="diff against merge-base(REF, HEAD); 'auto' picks the PR base in CI; default: $AGENT_CHECKS_BASE, else HEAD")
+    d.add_argument("--fail-under", type=float, default=diffcover.DEFAULT_FAIL_UNDER, metavar="PERCENT")
+    d.add_argument("--report-only", action="store_true", help="print the result but always exit 0 (the first week, to see the baseline)")
+    d.add_argument("--format", choices=["text", "github"], default="text")
+
     h = sub.add_parser("hook", help="run as an agent hook (reads the hook payload on stdin)")
     h.add_argument("agent", choices=["claude"])
 
@@ -60,6 +68,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return {
             "check": cmd_check,
+            "diffcover": cmd_diffcover,
             "hook": cmd_hook,
             "install": cmd_install,
             "rules": cmd_rules,
@@ -196,6 +205,27 @@ def render_text(res: Result, header: str | None = None, footer: str = FOOTER) ->
         lines.append("")
     lines.append(footer)
     return render_warnings(res) + "\n".join(lines) + "\n"
+
+
+def _inside(root: Path, path: Path) -> set[str]:
+    """The path relative to the repo, as a set, so the report file itself is not measured as a change."""
+    p, r = path.resolve(), root.resolve()
+    return {p.relative_to(r).as_posix()} if p.is_relative_to(r) else set()
+
+
+def cmd_diffcover(a) -> int:
+    root = gitdiff.toplevel(Path(a.dir))
+    if root is None:
+        print("agent-checks: not inside a git repository", file=sys.stderr)
+        return 3
+    report = Path(a.coverage)
+    report = report if report.is_absolute() else Path(a.dir) / report
+    rep = diffcover.parse_report(report)
+    base = a.base or os.environ.get("AGENT_CHECKS_BASE") or None
+    changes = gitdiff.worktree(root, gitdiff.merge_base(root, resolve_base(root, base)) if base else None)
+    res = diffcover.measure(root, changes, rep, skip=_inside(root, report))
+    sys.stdout.write(diffcover.render(res, a.fail_under, a.report_only, a.format))
+    return 0 if a.report_only or res.percent >= a.fail_under else 1
 
 
 # --- agent hooks ---
