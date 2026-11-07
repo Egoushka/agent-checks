@@ -16,7 +16,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-BINARY = re.compile(r"^Binary files (?:a/(.*)|/dev/null) and (?:b/(.*)|/dev/null) differ$")
+_Q = r'"(?:[^"\\]|\\.)*"'
+BINARY = re.compile(rf"^Binary files (?:({_Q})|a/(.*?)|/dev/null) and (?:({_Q})|b/(.*?)|/dev/null) differ$")
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
@@ -60,7 +61,7 @@ def parse_diff(text: str) -> list[FileChange]:
     is_new = False
     line_no = 0
     last_plus = False
-    for line in text.splitlines():
+    for line in text.split("\n"):
         if line.startswith("diff --git "):
             cur, in_header, is_new, old, new = None, True, False, "", ""
             continue
@@ -68,9 +69,9 @@ def parse_diff(text: str) -> list[FileChange]:
             if line.startswith("new file mode"):
                 is_new = True
             elif line.startswith("--- "):
-                old = _unquote(line[4:])
+                old = _unquote(_untab(line[4:]))
             elif line.startswith("+++ "):
-                new = _unquote(line[4:])
+                new = _unquote(_untab(line[4:]))
                 deleted = new == "/dev/null"
                 path = (old if deleted else new)[2:]
                 cur = FileChange(path=path, new_file=is_new or old == "/dev/null", deleted=deleted)
@@ -78,7 +79,9 @@ def parse_diff(text: str) -> list[FileChange]:
             elif line.startswith("Binary files "):
                 m = BINARY.match(line)
                 if m:
-                    cur = FileChange(path=m.group(2) or m.group(1), new_file=m.group(1) is None, deleted=m.group(2) is None, binary=True)
+                    a = _unquote(m.group(1))[2:] if m.group(1) else m.group(2)
+                    b = _unquote(m.group(3))[2:] if m.group(3) else m.group(4)
+                    cur = FileChange(path=b if b is not None else a, new_file=a is None, deleted=b is None, binary=True)
                     changes.append(cur)
                 continue
             elif line.startswith("@@"):
@@ -103,6 +106,11 @@ def parse_diff(text: str) -> list[FileChange]:
         elif line.startswith("\\") and last_plus:
             cur.no_final_newline = True
     return changes
+
+
+def _untab(p: str) -> str:
+    # git ends a ---/+++ path that contains a space with a tab; a real trailing tab would be quoted
+    return p.removesuffix("\t")
 
 
 def _unquote(p: str) -> str:
