@@ -64,6 +64,7 @@ brew install lefthook betterleaks zizmor  # the commit-hook runner, the secret s
 cd your-repo && agent-checks install  # writes lefthook.yml + .agent-checks.toml, installs the hooks
 agent-checks check                    # what you have staged, or the working tree against HEAD
 agent-checks diffcover --base origin/main  # share of added lines your tests run, from coverage.xml (docs/beyond.md)
+agent-checks verify-record change-record.json  # a change record: what a change claims and the checks that proved it
 ```
 
 In CI, on pull requests (check out at least two commits so the base is present):
@@ -123,6 +124,8 @@ the raw-SQL rule start as `warn`.
 - [templates/](templates): copyable scaffolds that are not diff checks: NuGet and `Directory.Build.props`
   settings, a Stryker workflow, .NET test tooling (ArchUnitNET, Coyote, hurl, oasdiff) and Dependabot
   auto-merge.
+- [docs/change-record-v0.1.md](docs/change-record-v0.1.md): the change-record format, an in-toto predicate that says
+  what a change claims and which checks proved it, with its JSON Schema and `verify-record` (CC BY 4.0).
 - [docs/beyond.md](docs/beyond.md): what else raises agent code quality (diff coverage, mutation testing
   on changed code, snapshots, property tests), ranked with a recommendation.
 

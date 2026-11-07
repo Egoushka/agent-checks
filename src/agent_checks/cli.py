@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import __version__, diffcover, gitdiff, install
+from . import __version__, diffcover, gitdiff, install, record
 from . import rules as R
 from .engine import Checker, Config, Finding, Result
 
@@ -46,6 +46,10 @@ def main(argv: list[str] | None = None) -> int:
     d.add_argument("--report-only", action="store_true", help="print the result but always exit 0 (the first week, to see the baseline)")
     d.add_argument("--format", choices=["text", "github"], default="text")
 
+    v = sub.add_parser("verify-record", help="fail unless a change record (an in-toto Statement) is well formed and every check in it passed")
+    v.add_argument("file", help="the Statement, as JSON")
+    v.add_argument("--format", choices=["text", "github"], default="text")
+
     h = sub.add_parser("hook", help="run as an agent hook (reads the hook payload on stdin)")
     h.add_argument("agent", choices=["claude"])
 
@@ -69,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
         return {
             "check": cmd_check,
             "diffcover": cmd_diffcover,
+            "verify-record": cmd_verify_record,
             "hook": cmd_hook,
             "install": cmd_install,
             "rules": cmd_rules,
@@ -226,6 +231,13 @@ def cmd_diffcover(a) -> int:
     res = diffcover.measure(root, changes, rep, skip=_inside(root, report))
     sys.stdout.write(diffcover.render(res, a.fail_under, a.report_only, a.format))
     return 0 if a.report_only or res.percent >= a.fail_under else 1
+
+
+def cmd_verify_record(a) -> int:
+    path = Path(a.file)
+    verdict = record.verify_file(path)
+    sys.stdout.write(record.render(path, verdict, a.format))
+    return 0 if verdict.ok else 1
 
 
 # --- agent hooks ---
