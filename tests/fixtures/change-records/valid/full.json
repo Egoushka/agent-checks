@@ -1,0 +1,82 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "git+https://github.com/example/api",
+      "digest": {
+        "gitCommit": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+        "sha256": "dc9c5edb8b2d479e697b4b0b8ab874f32b325138598ce9e7b759eb8292110622"
+      }
+    },
+    {
+      "name": "release.tar.gz",
+      "digest": {
+        "sha256": "db4b4d0d1cb480bf9aeea253771c00febe627f236765fa37d6a5614f079a3aa0"
+      }
+    }
+  ],
+  "predicateType": "https://github.com/Egoushka/agent-checks/change-record/v0.1",
+  "predicate": {
+    "spec": {
+      "uri": "docs/specs/rate-limit.md",
+      "digest": {
+        "sha256": "41a1a22552b239020fe687423a53a564d4b1fd064f984cd8c4eda393b06fb72c"
+      }
+    },
+    "claim": "The API answers 429 with Retry-After once a client passes 100 requests per minute, and never blocks other clients.",
+    "checks": [
+      {
+        "name": "unit",
+        "command": "dotnet test --filter Category=RateLimit",
+        "result": "pass",
+        "evidence": {
+          "digest": {
+            "sha256": "9b52ad9c39c20cfafbf39c6c2b01156670313c53149ce7114ad1ce7a065b7b1b",
+            "sha512": "abababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababababab"
+          },
+          "uri": "https://ci.example.com/runs/981/logs/unit"
+        }
+      },
+      {
+        "name": "diff coverage",
+        "command": "agent-checks diffcover --base origin/main",
+        "result": "pass",
+        "evidence": {
+          "digest": {
+            "sha256": "c73217eb659ed330b28ebb1dbbe0aebb77dd90b9d6f6addd55e0ac8637bb5699"
+          }
+        }
+      },
+      {
+        "name": "agent smells",
+        "command": "agent-checks check --base origin/main",
+        "result": "pass",
+        "evidence": {
+          "digest": {
+            "sha256": "20f65c28671b40937c5bf23acc7c6f37e5a5ec0622e347b57685725df5ba9e50"
+          }
+        }
+      }
+    ],
+    "scope": {
+      "paths": [
+        "src/Api/RateLimiting/**",
+        "tests/Api.Tests/RateLimiting/**"
+      ]
+    },
+    "risk": {
+      "level": "high",
+      "rationale": "Runs on every request; a bug blocks all clients."
+    },
+    "agent": {
+      "name": "claude-code",
+      "version": "2.4.0",
+      "model": "anthropic/claude-opus-4-5-20251101",
+      "trace": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "uri": "https://traces.example.com/550e8400"
+      }
+    },
+    "futureField": "ignored by consumers"
+  }
+}

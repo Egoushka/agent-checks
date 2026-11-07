@@ -1,0 +1,54 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "git+https://gitlab.example.com/team/svc",
+      "digest": {
+        "gitCommit": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
+      }
+    }
+  ],
+  "predicateType": "https://github.com/Egoushka/agent-checks/change-record/v0.1",
+  "predicate": {
+    "spec": {
+      "uri": "https://gitlab.example.com/team/svc/-/issues/7"
+    },
+    "claim": "The nightly import skips rows it has already loaded.",
+    "checks": [
+      {
+        "name": "import integration",
+        "command": "make test-import",
+        "result": "pass",
+        "evidence": {
+          "digest": {
+            "sha256": "eb918be53db55109b4040e9c5d32b96481ce1cf039f04edd3f72f24b4aaa7587"
+          }
+        }
+      },
+      {
+        "name": "manual rerun",
+        "command": "./scripts/import.sh --dry-run",
+        "result": "pass",
+        "evidence": {
+          "digest": {
+            "sha256": "bc82fae06794d73b8c59471d2ebd10ef3741919cfcb3f88bafd3d0635cb5a624"
+          },
+          "uri": "artifacts/dry-run.txt"
+        }
+      }
+    ],
+    "scope": {
+      "paths": [
+        "svc/import/**"
+      ]
+    },
+    "risk": {
+      "level": "medium",
+      "rationale": "Touches production data loading."
+    },
+    "agent": {
+      "name": "opencode",
+      "model": "openai/gpt-5"
+    }
+  }
+}

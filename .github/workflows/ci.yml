@@ -19,10 +19,21 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
-      - run: pip install -e . pytest pytest-cov
+      - run: pip install -e . pytest pytest-cov jsonschema
       - run: git config --global user.email ci@example.com && git config --global user.name ci
       - run: pytest -q --cov=agent_checks --cov-report=xml
       # Report only until 2026-11-14: read the baseline, then drop --report-only (docs/beyond.md item 1).
       - if: matrix.python == '3.13' && github.event_name == 'pull_request'
         run: agent-checks diffcover --base auto --report-only --format github
       - run: ruff check src tests
+  verify-record-action:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # This repo tests its own action from the PR checkout.
+      - uses: ./verify-record  # zizmor: ignore[self-repository] this repo tests its own action from the PR checkout
+        with:
+          record: tests/fixtures/change-records/valid/full.json

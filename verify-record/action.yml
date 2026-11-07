@@ -1,0 +1,20 @@
+name: agent-checks verify-record
+description: Fail unless a change record (an in-toto Statement, predicate change-record/v0.1) is well formed and every check in it passed.
+branding:
+  icon: check-circle
+  color: green
+inputs:
+  record:
+    description: Path to the Statement, as JSON.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install agent-checks from this action's checkout
+      shell: bash
+      run: pipx install --quiet "${{ github.action_path }}/.."
+    - name: agent-checks verify-record
+      shell: bash
+      env:
+        RECORD: ${{ inputs.record }}
+      run: agent-checks verify-record --format github "$RECORD"

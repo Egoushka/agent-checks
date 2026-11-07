@@ -37,4 +37,4 @@ line-length = 160
 target-version = "py311"
 
 [dependency-groups]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "jsonschema>=4.18"]

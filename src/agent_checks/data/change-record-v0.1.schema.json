@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Egoushka/agent-checks/change-record/v0.1/schema.json",
+  "title": "Change record v0.1 (the predicate of an in-toto Statement)",
+  "description": "predicateType https://github.com/Egoushka/agent-checks/change-record/v0.1. Unknown fields are ignored, as in-toto's default parsing rules say.",
+  "type": "object",
+  "required": ["spec", "claim", "checks", "scope", "risk", "agent"],
+  "properties": {
+    "spec": {
+      "description": "What the change is meant to do: the issue, ticket or document it implements.",
+      "type": "object",
+      "required": ["uri"],
+      "properties": {
+        "uri": { "type": "string", "minLength": 1 },
+        "digest": { "$ref": "#/$defs/digestSet" }
+      }
+    },
+    "claim": {
+      "description": "One statement of what the change does or guarantees, which the checks are meant to prove.",
+      "type": "string",
+      "minLength": 1
+    },
+    "checks": {
+      "description": "The checks that were run against the change.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["command", "result", "evidence"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "command": { "type": "string", "minLength": 1 },
+          "result": { "enum": ["pass", "fail", "error", "skipped"] },
+          "evidence": {
+            "type": "object",
+            "required": ["digest"],
+            "properties": {
+              "digest": { "$ref": "#/$defs/digestSet" },
+              "uri": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "scope": {
+      "description": "What the claim covers.",
+      "type": "object",
+      "required": ["paths"],
+      "properties": {
+        "paths": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "required": ["level"],
+      "properties": {
+        "level": { "enum": ["low", "medium", "high"] },
+        "rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "agent": {
+      "description": "The agent that made the change.",
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string", "minLength": 1 },
+        "model": { "description": "provider/model-name, as in Agent Trace.", "type": "string", "minLength": 1, "maxLength": 250 },
+        "trace": {
+          "description": "The Agent Trace record for the same change.",
+          "type": "object",
+          "required": ["id"],
+          "properties": {
+            "id": { "type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$" },
+            "uri": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digestSet": {
+      "description": "An in-toto DigestSet: algorithm name to lowercase hex. sha256 is required, as in-toto recommends.",
+      "type": "object",
+      "required": ["sha256"],
+      "properties": {
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      },
+      "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]+$" }
+    }
+  }
+}
