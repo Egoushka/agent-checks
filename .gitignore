@@ -5,4 +5,3 @@ dist/
 .pytest_cache/
 coverage.xml
 .coverage
-.tmp/
