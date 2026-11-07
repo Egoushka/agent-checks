@@ -11,7 +11,7 @@ import sys
 import time
 from pathlib import Path
 
-from . import __version__, diffcover, gitdiff, install, record
+from . import __version__, change_record, diffcover, gitdiff, install, record
 from . import rules as R
 from .engine import Checker, Config, Finding, Result
 
@@ -50,6 +50,12 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("file", help="the Statement, as JSON")
     v.add_argument("--format", choices=["text", "github"], default="text")
 
+    cr = sub.add_parser("change-record", help="fail unless a pull request body carries Spec, Claim, Checks, Scope, Risk and Agent, and the change stays in Scope")
+    cr.add_argument("-C", dest="dir", default=".", help="run in this directory")
+    cr.add_argument("--body", metavar="FILE", help="the PR body as a file ('-' for stdin); default: the pull_request body in $GITHUB_EVENT_PATH")
+    cr.add_argument("--base", metavar="REF", help="check changed files against Scope, diffing merge-base(REF, HEAD); 'auto' picks the PR base in CI")
+    cr.add_argument("--format", choices=["text", "github"], default="text")
+
     h = sub.add_parser("hook", help="run as an agent hook (reads the hook payload on stdin)")
     h.add_argument("agent", choices=["claude"])
 
@@ -74,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
             "check": cmd_check,
             "diffcover": cmd_diffcover,
             "verify-record": cmd_verify_record,
+            "change-record": cmd_change_record,
             "hook": cmd_hook,
             "install": cmd_install,
             "rules": cmd_rules,
@@ -238,6 +245,42 @@ def cmd_verify_record(a) -> int:
     verdict = record.verify_file(path)
     sys.stdout.write(record.render(path, verdict, a.format))
     return 0 if verdict.ok else 1
+
+
+def read_pr_body(a) -> str:
+    if a.body == "-":
+        return sys.stdin.read()
+    if a.body:
+        try:
+            return Path(a.body).read_text(encoding="utf-8")
+        except OSError as e:
+            raise ValueError(f"cannot read {a.body}: {e.strerror or e}") from e
+    event = os.environ.get("GITHUB_EVENT_PATH")
+    if not event:
+        raise ValueError("no PR body: pass --body FILE, or run on a pull_request event in GitHub Actions")
+    try:
+        payload = json.loads(Path(event).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        raise ValueError(f"cannot read the event payload {event}: {e}") from e
+    pr = payload.get("pull_request") if isinstance(payload, dict) else None
+    if pr is None:
+        raise ValueError(f"{event} is not a pull_request event; the change-record rule runs on pull requests")
+    return pr.get("body") or ""
+
+
+def cmd_change_record(a) -> int:
+    body = read_pr_body(a)
+    changed = None
+    if a.base:
+        root = gitdiff.toplevel(Path(a.dir))
+        if root is None:
+            print("agent-checks: not inside a git repository", file=sys.stderr)
+            return 3
+        ref = gitdiff.merge_base(root, resolve_base(root, a.base))
+        changed = [c.path for c in gitdiff.worktree(root, ref)]
+    rep = change_record.check(body, changed)
+    sys.stdout.write(change_record.render(rep, a.format))
+    return 0 if rep.ok else 1
 
 
 # --- agent hooks ---

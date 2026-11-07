@@ -65,6 +65,7 @@ cd your-repo && agent-checks install  # writes lefthook.yml + .agent-checks.toml
 agent-checks check                    # what you have staged, or the working tree against HEAD
 agent-checks diffcover --base origin/main  # share of added lines your tests run, from coverage.xml (docs/beyond.md)
 agent-checks verify-record change-record.json  # a change record: what a change claims and the checks that proved it
+agent-checks change-record --body pr.md --base origin/main  # the PR body carries Spec, Claim, Checks, Scope, Risk, Agent
 ```
 
 In CI, on pull requests (check out at least two commits so the base is present):
@@ -74,6 +75,10 @@ In CI, on pull requests (check out at least two commits so the base is present):
   with: { fetch-depth: 2 }
 - uses: Egoushka/agent-checks@v0.1.6
 ```
+
+To require that a PR body carries Spec, Claim, Checks, Scope, Risk and Agent, and that the change stays inside
+Scope, add `- uses: Egoushka/agent-checks/change-record@<tag>` to a job on `pull_request` (types `opened`,
+`edited`, `synchronize`) and make it a required check ([docs/specs/change-record-rule.md](docs/specs/change-record-rule.md)).
 
 For Claude Code, one `PostToolUse` hook on `Edit|Write|MultiEdit` that runs `agent-checks hook claude`.
 It does nothing in repos without `.agent-checks.toml`; where there is one, a problem in the lines just
@@ -126,6 +131,8 @@ the raw-SQL rule start as `warn`.
   auto-merge.
 - [docs/change-record-v0.1.md](docs/change-record-v0.1.md): the change-record format, an in-toto predicate that says
   what a change claims and which checks proved it, with its JSON Schema and `verify-record` (CC BY 4.0).
+- [docs/specs/change-record-rule.md](docs/specs/change-record-rule.md): the `change-record` rule, the same six
+  fields as plain lines in a PR body, and its action in [change-record/](change-record).
 - [docs/beyond.md](docs/beyond.md): what else raises agent code quality (diff coverage, mutation testing
   on changed code, snapshots, property tests), ranked with a recommendation.
 
