@@ -6,6 +6,7 @@ A line the report does not list is not executable (blank, comment, signature) an
 
 from __future__ import annotations
 
+import math
 import posixpath
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
@@ -111,9 +112,21 @@ def ranges(nums: list[int]) -> str:
     return ",".join(str(g[0]) if len(g) == 1 else f"{g[0]}-{g[-1]}" for g in groups)
 
 
+def shown(percent: float, fail_under: float) -> str:
+    """The percent with as few decimals as keep it on the same side of fail_under as the unrounded value."""
+    ok = percent >= fail_under
+    for d in range(3):
+        s = f"{percent:.{d}f}"
+        if (float(s) >= fail_under) == ok:
+            return s
+    # Still on the wrong side at two decimals: round toward the side the check decided.
+    cut = (math.ceil if ok else math.floor)(percent * 100) / 100
+    return f"{cut:.2f}"
+
+
 def render(res: Result, fail_under: float, report_only: bool, fmt: str = "text") -> str:
     ok = res.percent >= fail_under
-    head = f"{res.percent:.0f}% of {res.total} added executable lines are run by tests (need {fail_under:g}%)"
+    head = f"{shown(res.percent, fail_under)}% of {res.total} added executable lines are run by tests (need {fail_under:g}%)"
     notes = f"; {len(res.unmeasured)} changed file(s) not in the report" if res.unmeasured else ""
     if fmt == "github":
         out = []
