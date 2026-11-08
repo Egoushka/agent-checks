@@ -148,3 +148,27 @@ def test_missing_report_is_an_error(change, capsys):
 
 def test_ranges():
     assert diffcover.ranges([1, 2, 3, 7, 9, 10]) == "1-3,7,9-10"
+
+
+def test_failing_percent_never_reads_as_the_threshold():
+    res = diffcover.Result(covered=796, missed={"src/a.py": list(range(1, 205))})
+    out = diffcover.render(res, 80, report_only=False)
+    assert "79.6% of 1000 added executable lines" in out
+    assert "(need 80%)" in out
+
+
+def test_passing_percent_keeps_whole_numbers():
+    res = diffcover.Result(covered=799, missed={"src/a.py": [1]})
+    assert "ok, 100% of 800" in diffcover.render(res, 80, report_only=False)
+
+
+@pytest.mark.parametrize(("percent", "fail_under", "expected"), [
+    (79.6, 80, "79.6"),
+    (79.996, 80, "79.99"),
+    (80.0, 80, "80"),
+    (50.0, 80, "50"),
+    (80.004, 80.005, "80"),
+    (80.0049, 80.0045, "80.01"),
+])
+def test_shown_stays_on_the_side_the_check_decided(percent, fail_under, expected):
+    assert diffcover.shown(percent, fail_under) == expected
