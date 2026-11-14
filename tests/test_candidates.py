@@ -104,6 +104,30 @@ def test_render_mine_and_replay_text():
     assert "1 false positive" in candidates.render_replay(bad) and "a.py:1" in candidates.render_replay(bad)
 
 
+def test_render_replay_announces_the_stop_condition_at_the_threshold():
+    bad = candidates.ReplayResult(repo="r", commits=10, hits=[candidates.Hit("abc123", "a.py", 1, "x\n")])
+    assert "stop mining" not in candidates.render_replay(bad, streak=2)
+    assert "stop mining" in candidates.render_replay(bad, streak=3)
+
+
+def test_record_replay_tracks_a_streak_of_consecutive_false_positives(tmp_path):
+    state = tmp_path / "state.json"
+    bad = candidates.ReplayResult(repo="r", commits=10, hits=[candidates.Hit("abc123", "a.py", 1, "x\n")])
+    ok = candidates.ReplayResult(repo="r", commits=10, hits=[])
+    assert candidates.record_replay(bad, state) == 1
+    assert candidates.record_replay(bad, state) == 2
+    assert candidates.record_replay(bad, state) == 3
+    assert candidates.record_replay(ok, state) == 0  # a clean replay resets the streak
+    assert candidates.load_streak(state) == 0
+
+
+def test_load_streak_defaults_to_zero_when_the_state_file_is_missing_or_bad(tmp_path):
+    assert candidates.load_streak(tmp_path / "missing.json") == 0
+    bad = tmp_path / "bad.json"
+    bad.write_text("not json")
+    assert candidates.load_streak(bad) == 0
+
+
 def test_cli_mine_then_replay(tmp_path, capsys):
     cases = tmp_path / "rejections.json"
     cases.write_text(

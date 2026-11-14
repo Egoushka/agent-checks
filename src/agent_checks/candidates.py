@@ -207,7 +207,34 @@ def render_mine(mined: list[Candidate], out_dir: Path) -> str:
     return "\n".join(lines) + "\n"
 
 
-def render_replay(res: ReplayResult) -> str:
+DEFAULT_STATE = Path(".agent-checks/candidate-state.json")
+STOP_AFTER = 3  # the issue's stop condition: this many candidates in a row with false positives means stay hand-written
+
+
+def load_streak(path: Path) -> int:
+    """The number of candidates replayed in a row (most recent first) that came back with false positives."""
+    if not path.is_file():
+        return 0
+    try:
+        return int(json.loads(path.read_text()).get("consecutive_false_positives", 0))
+    except (OSError, json.JSONDecodeError, ValueError, TypeError):
+        return 0
+
+
+def save_streak(path: Path, streak: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"consecutive_false_positives": streak}) + "\n")
+
+
+def record_replay(res: ReplayResult, state_path: Path) -> int:
+    """Update the on-disk streak of consecutive false-positive replays and return the new value: 0 after
+    a clean replay (the streak resets), incremented after one with hits."""
+    streak = 0 if res.ok else load_streak(state_path) + 1
+    save_streak(state_path, streak)
+    return streak
+
+
+def render_replay(res: ReplayResult, streak: int = 0) -> str:
     if res.ok:
         return f"agent-checks: 0 false positives on {res.commits} commits of {res.repo}. Safe to raise this candidate above warn.\n"
     lines = [f"agent-checks: {len(res.hits)} false positive{'s' if len(res.hits) != 1 else ''} on {res.commits} commits of {res.repo}:"]
@@ -216,4 +243,9 @@ def render_replay(res: ReplayResult) -> str:
     if len(res.hits) > 20:
         lines.append(f"  ... and {len(res.hits) - 20} more")
     lines.append("This candidate still fires on accepted code. Narrow the pattern and mine again, or stay hand-written.")
+    if streak >= STOP_AFTER:
+        lines.append(
+            f"agent-checks: {streak} candidates in a row have had false positives on replay. Per the stop condition, "
+            "stop mining this kind of candidate and write the next rule by hand instead."
+        )
     return "\n".join(lines) + "\n"

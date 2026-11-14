@@ -60,6 +60,11 @@ Per the issue: three candidates in a row that come back with false positives on 
 mistake is not mining cleanly from the records available, and the next rule in that area should be hand-written
 instead of mined.
 
+`agent-checks replay` tracks this itself: each run reads and updates a streak of consecutive false-positive
+replays in `--state` (default `.agent-checks/candidate-state.json`) — a clean replay resets it to 0, a replay
+with hits increments it. Once the streak reaches 3, `replay`'s output says so explicitly: stop mining this kind
+of candidate and write the next rule by hand.
+
 ## Out of scope here
 
 Fetching PRs from GitHub, deciding a PR was "rejected," and turning a clean replay into a merged `rules.py` entry

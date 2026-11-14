@@ -82,6 +82,9 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("candidate", help="a candidate rule JSON file written by `mine`")
     rp.add_argument("-C", dest="dir", default=".", help="run in this directory")
     rp.add_argument("-n", type=int, default=360, help="commits of history to replay over (default: 360)")
+    rp.add_argument(
+        "--state", default=str(candidates.DEFAULT_STATE), metavar="FILE", help="track the consecutive-false-positive streak here (default: .agent-checks/candidate-state.json)"
+    )
 
     n = sub.add_parser("count", help="print the number of open findings across repos as {findings, asOf}, with no repo or file names")
     n.add_argument("dirs", nargs="+", metavar="DIR", help="repos to audit (every tracked line, as check --all)")
@@ -402,7 +405,10 @@ def cmd_replay(a) -> int:
         print("agent-checks: not inside a git repository", file=sys.stderr)
         return 3
     res = candidates.replay(candidates.load_candidate(Path(a.candidate)), root, n=a.n)
-    sys.stdout.write(candidates.render_replay(res))
+    state = Path(a.state)
+    state = state if state.is_absolute() else Path(a.dir) / state
+    streak = candidates.record_replay(res, state)
+    sys.stdout.write(candidates.render_replay(res, streak))
     return 0 if res.ok else 1
 
 
