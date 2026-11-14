@@ -1,6 +1,8 @@
 import json
 
-from agent_checks import cli
+from conftest import Repo
+
+from agent_checks import candidates, cli
 
 HAS_PRINT = """\
 id: has-print
@@ -73,3 +75,36 @@ def test_candidates_rejects_an_empty_rule_dir(tmp_path, repo, capsys):
     empty.mkdir()
     code = cli.main(["candidates", str(empty), str(repo.root)])
     assert code == 3
+
+
+def test_candidates_fails_without_ast_grep(tmp_path, repo, capsys, monkeypatch):
+    monkeypatch.setattr(candidates, "tool", lambda name: None)
+
+    rule_dir = tmp_path / "candidates"
+    rule_dir.mkdir()
+    (rule_dir / "no-match.yml").write_text(NO_MATCH)
+
+    code = cli.main(["candidates", str(rule_dir), str(repo.root)])
+    err = capsys.readouterr().err
+    assert code == 3
+    assert "ast-grep is not installed" in err
+
+
+def test_candidates_aggregates_false_positives_across_repos(tmp_path, tmp_path_factory, repo, capsys):
+    other = Repo(tmp_path_factory.mktemp("other"))
+    repo.write("src/a.py", 'print("hi")\n')
+    repo.commit("add a print")
+    other.write("src/b.py", 'print("bye")\n')
+    other.commit("add another print")
+
+    rule_dir = tmp_path / "candidates"
+    rule_dir.mkdir()
+    (rule_dir / "has-print.yml").write_text(HAS_PRINT)
+
+    code, out = run_candidates(capsys, rule_dir, repo.root, other.root)
+    data = json.loads(out)
+    rules = {r["id"]: r for r in data["rules"]}
+    assert code == 1
+    assert rules["has-print"]["falsePositives"] == 2
+    assert any(repo.root.name in ex for ex in rules["has-print"]["examples"])
+    assert any(other.root.name in ex for ex in rules["has-print"]["examples"])
