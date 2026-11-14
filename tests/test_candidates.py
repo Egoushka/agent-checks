@@ -126,6 +126,9 @@ def test_load_streak_defaults_to_zero_when_the_state_file_is_missing_or_bad(tmp_
     bad = tmp_path / "bad.json"
     bad.write_text("not json")
     assert candidates.load_streak(bad) == 0
+    not_an_object = tmp_path / "list.json"
+    not_an_object.write_text("[1, 2, 3]")
+    assert candidates.load_streak(not_an_object) == 0
 
 
 def test_cli_mine_then_replay(tmp_path, capsys):

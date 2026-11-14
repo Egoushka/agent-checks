@@ -217,13 +217,15 @@ def load_streak(path: Path) -> int:
         return 0
     try:
         return int(json.loads(path.read_text()).get("consecutive_false_positives", 0))
-    except (OSError, json.JSONDecodeError, ValueError, TypeError):
+    except (OSError, json.JSONDecodeError, ValueError, TypeError, AttributeError):
         return 0
 
 
 def save_streak(path: Path, streak: int) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"consecutive_false_positives": streak}) + "\n")
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps({"consecutive_false_positives": streak}) + "\n")
+    tmp.replace(path)
 
 
 def record_replay(res: ReplayResult, state_path: Path) -> int:
