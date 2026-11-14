@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 from . import __version__, change_record, diffcover, gitdiff, install, record
@@ -72,6 +73,10 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("-C", dest="dir", default=".")
     b.add_argument("-n", type=int, default=20)
 
+    n = sub.add_parser("count", help="print the number of open findings across repos as {findings, asOf}, with no repo or file names")
+    n.add_argument("dirs", nargs="+", metavar="DIR", help="repos to audit (every tracked line, as check --all)")
+    n.add_argument("--out", metavar="FILE", help="write the JSON here (atomically) instead of stdout")
+
     sub.add_parser("doctor", help="show which tools are installed")
 
     a = ap.parse_args(argv)
@@ -85,6 +90,7 @@ def main(argv: list[str] | None = None) -> int:
             "install": cmd_install,
             "rules": cmd_rules,
             "bench": cmd_bench,
+            "count": cmd_count,
             "doctor": cmd_doctor,
         }[a.cmd](a)
     except (gitdiff.GitError, ValueError) as e:
@@ -366,6 +372,25 @@ def cmd_bench(a) -> int:
     print(
         f"{root.name}: {len(s)} commits, median {sorted(lines)[len(lines) // 2]} added lines; check p50 {p50:.0f} ms, p95 {p95:.0f} ms, max {s[-1]:.0f} ms (in-process, excludes interpreter start)"
     )
+    return 0
+
+
+def cmd_count(a) -> int:
+    # One unreadable repo fails the run: skipping it would publish a count that is too low.
+    total = 0
+    for d in a.dirs:
+        root = gitdiff.toplevel(Path(d)) if Path(d).is_dir() else None
+        if root is None:
+            print("agent-checks: count: a directory is not inside a git repository", file=sys.stderr)
+            return 3
+        total += len(run_check(root, gitdiff.all_files(root)).findings)
+    text = json.dumps({"findings": total, "asOf": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")}) + "\n"
+    if not a.out:
+        sys.stdout.write(text)
+        return 0
+    tmp = Path(a.out + ".tmp")
+    tmp.write_text(text)
+    tmp.replace(a.out)
     return 0
 
 
