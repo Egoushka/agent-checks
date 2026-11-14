@@ -66,6 +66,8 @@ agent-checks check                    # what you have staged, or the working tre
 agent-checks diffcover --base origin/main  # share of added lines your tests run, from coverage.xml (docs/beyond.md)
 agent-checks verify-record change-record.json  # a change record: what a change claims and the checks that proved it
 agent-checks change-record --body pr.md --base origin/main  # the PR body carries Spec, Claim, Checks, Scope, Risk, Agent
+agent-checks mine rejections/ --out candidates    # mine rejected-PR records into candidate rules (docs/specs/candidate-rules.md)
+agent-checks replay candidates/x.json -C ../other-repo  # 0 false positives on history: ready to raise above warn
 ```
 
 In CI, on pull requests (check out at least two commits so the base is present):

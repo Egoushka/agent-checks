@@ -12,7 +12,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import __version__, change_record, diffcover, gitdiff, install, record
+from . import __version__, candidates, change_record, diffcover, gitdiff, install, record
 from . import rules as R
 from .engine import Checker, Config, Finding, Result
 
@@ -73,6 +73,16 @@ def main(argv: list[str] | None = None) -> int:
     b.add_argument("-C", dest="dir", default=".")
     b.add_argument("-n", type=int, default=20)
 
+    mi = sub.add_parser("mine", help="mine rejected-PR records into candidate rules")
+    mi.add_argument("cases", help="a JSON file, or a directory of JSON files, each a rejected-PR record (pr, path, lang, line, category, reason)")
+    mi.add_argument("--out", default="candidates", metavar="DIR", help="where to write candidate rules (default: candidates/)")
+    mi.add_argument("--min-support", type=int, default=2, metavar="N", help="a pattern needs at least N distinct rejected PRs before it becomes a candidate")
+
+    rp = sub.add_parser("replay", help="replay a candidate rule (from `mine`) over real history; zero false positives means it is ready to raise above warn")
+    rp.add_argument("candidate", help="a candidate rule JSON file written by `mine`")
+    rp.add_argument("-C", dest="dir", default=".", help="run in this directory")
+    rp.add_argument("-n", type=int, default=360, help="commits of history to replay over (default: 360)")
+
     n = sub.add_parser("count", help="print the number of open findings across repos as {findings, asOf}, with no repo or file names")
     n.add_argument("dirs", nargs="+", metavar="DIR", help="repos to audit (every tracked line, as check --all)")
     n.add_argument("--out", metavar="FILE", help="write the JSON here (atomically) instead of stdout")
@@ -90,6 +100,8 @@ def main(argv: list[str] | None = None) -> int:
             "install": cmd_install,
             "rules": cmd_rules,
             "bench": cmd_bench,
+            "mine": cmd_mine,
+            "replay": cmd_replay,
             "count": cmd_count,
             "doctor": cmd_doctor,
         }[a.cmd](a)
@@ -373,6 +385,25 @@ def cmd_bench(a) -> int:
         f"{root.name}: {len(s)} commits, median {sorted(lines)[len(lines) // 2]} added lines; check p50 {p50:.0f} ms, p95 {p95:.0f} ms, max {s[-1]:.0f} ms (in-process, excludes interpreter start)"
     )
     return 0
+
+
+def cmd_mine(a) -> int:
+    mined = candidates.mine(candidates.load_cases(Path(a.cases)), min_support=a.min_support)
+    out = Path(a.out)
+    for c in mined:
+        candidates.write_candidate(c, out)
+    sys.stdout.write(candidates.render_mine(mined, out))
+    return 0
+
+
+def cmd_replay(a) -> int:
+    root = gitdiff.toplevel(Path(a.dir))
+    if root is None:
+        print("agent-checks: not inside a git repository", file=sys.stderr)
+        return 3
+    res = candidates.replay(candidates.load_candidate(Path(a.candidate)), root, n=a.n)
+    sys.stdout.write(candidates.render_replay(res))
+    return 0 if res.ok else 1
 
 
 def cmd_count(a) -> int:
