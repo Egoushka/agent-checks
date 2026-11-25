@@ -12,7 +12,7 @@ import time
 from datetime import UTC, datetime
 from pathlib import Path
 
-from . import __version__, change_record, diffcover, gitdiff, install, record
+from . import __version__, candidates, change_record, diffcover, gitdiff, install, record
 from . import rules as R
 from .engine import Checker, Config, Finding, Result
 
@@ -77,6 +77,15 @@ def main(argv: list[str] | None = None) -> int:
     n.add_argument("dirs", nargs="+", metavar="DIR", help="repos to audit (every tracked line, as check --all)")
     n.add_argument("--out", metavar="FILE", help="write the JSON here (atomically) instead of stdout")
 
+    k = sub.add_parser(
+        "candidates",
+        help="replay candidate ast-grep rules on real history; a rule that fires on an already-accepted commit stays hand-written",
+    )
+    k.add_argument("rule_dir", metavar="RULE_DIR", help="directory of candidate rule YAML files, shaped like src/agent_checks/data/rules")
+    k.add_argument("dirs", nargs="+", metavar="DIR", help="repos to replay against")
+    k.add_argument("-n", type=int, default=40, metavar="N", help="non-merge commits per repo (default: 40)")
+    k.add_argument("--format", choices=["text", "json"], default="text")
+
     sub.add_parser("doctor", help="show which tools are installed")
 
     a = ap.parse_args(argv)
@@ -91,6 +100,7 @@ def main(argv: list[str] | None = None) -> int:
             "rules": cmd_rules,
             "bench": cmd_bench,
             "count": cmd_count,
+            "candidates": cmd_candidates,
             "doctor": cmd_doctor,
         }[a.cmd](a)
     except (gitdiff.GitError, ValueError) as e:
@@ -392,6 +402,63 @@ def cmd_count(a) -> int:
     tmp.write_text(text)
     tmp.replace(a.out)
     return 0
+
+
+def cmd_candidates(a) -> int:
+    rule_dir = Path(a.rule_dir)
+    if not rule_dir.is_dir():
+        print(f"agent-checks: {rule_dir} is not a directory", file=sys.stderr)
+        return 3
+    ids = candidates.candidate_ids(rule_dir)
+    if not ids:
+        print(f"agent-checks: no candidate rules (a *.yml with an id:) found in {rule_dir}", file=sys.stderr)
+        return 3
+    merged = {rid: candidates.RuleReplay(rid) for rid in ids}
+    commits = 0
+    for d in a.dirs:
+        root = gitdiff.toplevel(Path(d))
+        if root is None:
+            print(f"agent-checks: candidates: {d} is not inside a git repository", file=sys.stderr)
+            return 3
+        try:
+            per_repo, n = candidates.replay(root, rule_dir, a.n)
+        except RuntimeError as e:
+            print(f"agent-checks: {e}", file=sys.stderr)
+            return 3
+        commits += n
+        for rid, rr in per_repo.items():
+            merged[rid].count += rr.count
+            for h in rr.hits:
+                if len(merged[rid].hits) < candidates.MAX_EXAMPLES:
+                    merged[rid].hits.append(f"{root.name}@{h}")
+    sys.stdout.write(render_candidates(merged, commits, len(a.dirs), a.format))
+    return 1 if any(rr.count for rr in merged.values()) else 0
+
+
+def render_candidates(results: dict[str, candidates.RuleReplay], commits: int, repos: int, fmt: str) -> str:
+    if fmt == "json":
+        return (
+            json.dumps(
+                {
+                    "commits": commits,
+                    "repos": repos,
+                    "rules": [{"id": rid, "falsePositives": rr.count, "examples": rr.hits} for rid, rr in results.items()],
+                },
+                indent=2,
+            )
+            + "\n"
+        )
+    lines = [f"agent-checks candidates: replayed {len(results)} rule(s) over {commits} commit(s) across {repos} repo(s).", ""]
+    for rid, rr in results.items():
+        if rr.count == 0:
+            lines.append(f"{rid}: 0 false positives on history. Ready: move it from the candidate directory into the rule pack.")
+        else:
+            lines.append(f"{rid}: {rr.count} false positive{'s' if rr.count != 1 else ''} on history, stays hand-written:")
+            lines += [f"  {h}" for h in rr.hits]
+            if rr.count > len(rr.hits):
+                lines.append(f"  ... and {rr.count - len(rr.hits)} more")
+        lines.append("")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def cmd_doctor(a) -> int:

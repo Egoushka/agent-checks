@@ -113,6 +113,7 @@ checks comments in code and all text in docs, because identifiers and string dat
 | `agent-checks hook claude` | Claude Code PostToolUse hook; exit 2 hands the message to the agent |
 | `agent-checks install [DIR]` | lefthook.yml + .agent-checks.toml, existing `.githooks` scripts moved under lefthook |
 | `agent-checks bench -C DIR -n 20` | time the check over a repo's last commits |
+| `agent-checks candidates RULE_DIR DIR... [-n 40] [--format json]` | replay candidate ast-grep rules (shaped like `src/agent_checks/data/rules`) over each repo's last N non-merge commits; a rule that fires on an already-accepted commit is a false positive and stays hand-written; exit 0 only if every candidate has zero |
 | `agent-checks count DIR... [--out FILE]` | `{"findings": n, "asOf": "<ISO 8601>"}`: error findings over every tracked line of each repo, summed, no repo or file names. A nightly job runs it and a status page reads the file; `--out` writes atomically; an unreadable repo fails the run (exit 3) rather than lowering the count |
 | `agent-checks doctor` | which engines are installed |
 
