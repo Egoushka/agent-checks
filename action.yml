@@ -12,7 +12,11 @@ runs:
   steps:
     - name: Install agent-checks from this action's checkout
       shell: bash
-      run: pipx install --quiet "${{ github.action_path }}"
+      # A venv, not pipx: the nickel pool image has no pipx (Home Forge, 2026-11-26) and its home is a small tmpfs.
+      run: |
+        python3 -m venv "$RUNNER_TEMP/agent-checks-venv"
+        "$RUNNER_TEMP/agent-checks-venv/bin/pip" install --quiet "${{ github.action_path }}"
+        echo "$RUNNER_TEMP/agent-checks-venv/bin" >> "$GITHUB_PATH"
     - name: Make sure the base commit is present
       shell: bash
       run: git rev-parse -q --verify HEAD^1 >/dev/null || git fetch --quiet --deepen=1 origin "$(git rev-parse HEAD)"
